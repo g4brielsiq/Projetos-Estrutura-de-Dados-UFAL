@@ -1,20 +1,32 @@
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
+#include <stdbool.h>
 
-int QuantasCasas(int numero)
+int QuantasCasas(long long int numero)
 {
     int casas = 1;
     while((numero = numero/10) >= 1)
     {
         casas+=1;
     }
-    printf("\nO número digitado tem %d casas",casas);
+    if(casas == 1)
+    {
+        printf("\nO número digitado tem 1 casa");
+    }
+    else
+    {
+        printf("\nO número digitado tem %d casas",casas);
+    }
+   
     return casas;
 }
 
 
-void Impressora(int numero, int casas)
+void Impressora(long long int numero, int casas)
 {
+    
+
     printf("\nCheguei");
     return;
 }
@@ -23,10 +35,18 @@ void Impressora(int numero, int casas)
 
 int main()
 {
-    int numero;
+    long long int numero;
+    bool negativo;
     printf("Insira aqui o número:");
-    scanf("%d",&numero);
+    scanf("%lld",&numero);
+    if(numero < 0)
+    {
+        negativo = true;
+        numero = llabs(numero);  // Menos é Mais 
+
+    }
     printf("\n");
-    Impressora(numero,QuantasCasas(numero));
+    int casas = QuantasCasas(numero);
+    Impressora(numero,casas);
 
 }
