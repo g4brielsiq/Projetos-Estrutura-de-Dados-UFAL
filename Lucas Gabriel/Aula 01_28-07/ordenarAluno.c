@@ -6,18 +6,24 @@
 
 struct Aluno
 {
-    char nome[10];
-    int nota;
+    char nome[20];
+    double nota;
 };
 
 void preencherAlunos(int x, int num, struct Aluno alunos[])
 {
+
     if (x < num)
     {
-        scanf("%s", &alunos[x].nome);
-        scanf("%d", &alunos[x].nota);
+        fgets(alunos[x].nome, 20, stdin);
 
-        return preencherAlunos((x + 1), num, alunos);
+        // Remover o '\n' final do nome (se houver)
+        alunos[x].nome[strcspn(alunos[x].nome, "\n")] = '\0';
+
+        scanf("%lf", &alunos[x].nota);
+        getchar(); // consumir o '\n' deixado no buffer
+
+        return preencherAlunos(x + 1, num, alunos);
     }
 
     return;
@@ -27,7 +33,8 @@ void imprimirAlunos(int x, int num, struct Aluno alunos[])
 {
     if (x < num)
     {
-        printf("\n| %s - %d |", alunos[x].nome, alunos[x].nota);
+        printf("| %s - %.2lf |", alunos[x].nome, alunos[x].nota);
+        printf("\n");
 
         return imprimirAlunos((x + 1), num, alunos);
     }
@@ -39,6 +46,7 @@ int main()
 {
     int total;
     scanf("%d", &total);
+    getchar();
 
     struct Aluno alunos[total];
 
