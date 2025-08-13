@@ -28,62 +28,27 @@ void imprimirArray(int x, int total, int array[])
     return;
 }
 
-void insertionSort(int total, int array[])
+void binSort(int total, int array[])
 {
     for (int i = 1; i < total; i++)
     {
-        int chave = array[i];
+        int key = array[i];
         int j = i - 1;
 
-        while (j >= 0 && array[j] > chave)
+        while (j >= 0 && array[j] > key)
         {
             array[j + 1] = array[j];
             j--;
         }
 
-        array[j + 1] = chave;
-    }
-}
-
-// Bin Sort ou Bucket Sort
-// - 
-
-void binSort(int total, int array[])
-{
-    int i, j, k;
-    int buckets[10][10];
-    int count[10];
-
-    for (i = 0; i < 10; i++)
-    {
-        count[i] = 0;
-    }
-
-    for (i = 0; i < total; i++)
-    {
-        int idx = array[i] / 10;
-        buckets[idx][count[idx]++] = array[i];
-    }
-
-    for (i = 0; i < 10; i++)
-    {
-        insertionSort(buckets[i], count[i]);
-    }
-
-    k = 0;
-    for (i = 0; i < 10; i++)
-    {
-        for (j = 0; j < count[i]; j++)
-        {
-            array[k++] = buckets[i][j];
-        }
+        array[j + 1] = key;
     }
 }
 
 int main()
 {
     int total;
-    printf("\nInforme o tamanho do vetor: ");
+    printf("Informe o tamanho do vetor: ");
     scanf("%d", &total);
 
     int array[total];
