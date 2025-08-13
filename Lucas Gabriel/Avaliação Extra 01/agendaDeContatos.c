@@ -100,7 +100,7 @@ void adicionarContato(int total, struct Contato array[])
 
     if (buscador == false)
     {
-        printf("\nERRO: NÃO HÁ ESPAÇO PARA UM NOVO CONTATO!");
+        printf("\nERRO: NÃO HÁ ESPAÇO PARA UM NOVO CONTATO!\n");
 
         return;
     }
@@ -131,7 +131,11 @@ void adicionarContato(int total, struct Contato array[])
 
     int posInsercao = 0;
 
-    while (posInsercao < total && array[posInsercao].ativo &&
+    // strcmp == 0  → igual
+    // strcmp < 0   → vem antes (ASCII menor)
+    // strcmp > 0   → vem depois (ASCII maior)
+
+    while (posInsercao < total && array[posInsercao].ativo == true &&
            strcmp(novo.nome, array[posInsercao].nome) > 0)
     {
         posInsercao++;
@@ -141,10 +145,10 @@ void adicionarContato(int total, struct Contato array[])
     int dir = posInsercao + 1;
     int direcao = 0;
 
-    if (!array[posInsercao].ativo)
+    if (array[posInsercao].ativo == false)
     {
         array[posInsercao] = novo;
-        printf("Contato adicionado!\n");
+        printf("\nContato adicionado!\n");
         return;
     }
 
@@ -172,6 +176,7 @@ void adicionarContato(int total, struct Contato array[])
         {
             array[i] = array[i + 1];
         }
+
         posInsercao--;
     }
 
@@ -183,112 +188,25 @@ void adicionarContato(int total, struct Contato array[])
         }
     }
 
-    else
-    {
-        printf("ERRO: Não há espaço para novo contato!\n");
-        return;
-    }
-
     array[posInsercao] = novo;
-    printf("Contato adicionado!\n");
+
+    bubbleSort(total, array);
+
+    printf("\nContato adicionado!\n");
 }
-
-// void adicionarContato(int total, struct Contato array[])
-// {
-//     int posicao, menorEsquerdo, menorDireito;
-//     printf("\nInforme a posição do contato para adicionar: ");
-//     scanf("%d", &posicao);
-
-//     bool buscador = false;
-
-//     for (int i = 0; i < total; i++)
-//     {
-//         if (array[i].ativo == false)
-//         {
-//             buscador = true;
-//         }
-//     }
-
-//     if (buscador == false)
-//     {
-//         printf("\nERRO: NÃO HÁ ESPAÇO PARA UM NOVO CONTATO!");
-
-//         return;
-//     }
-
-//     if (array[posicao].ativo == true)
-//     {
-//         int auxEsq = posicao;
-
-//         while (array[auxEsq].ativo == true)
-//         {
-//             auxEsq--;
-//         }
-
-//         menorEsquerdo = posicao - auxEsq;
-
-//         int auxDir = posicao;
-
-//         while (array[auxDir].ativo == true)
-//         {
-//             auxDir++;
-//         }
-
-//         menorDireito = auxDir - posicao;
-
-//         if (menorEsquerdo < menorDireito)
-//         {
-//             for (int i = auxEsq; i < posicao; i++)
-//             {
-//                 array[i] = array[i + 1];
-//             }
-//         }
-
-//         else
-//         {
-//             for (int i = auxDir; i > posicao; i--)
-//             {
-//                 array[i] = array[i - 1];
-//             }
-//         }
-
-//         array[posicao].ativo = false;
-//     }
-
-//     else if (array[posicao].ativo == false)
-//     {
-//         fgets(array[posicao].nome, 20, stdin);
-//         array[posicao].nome[strcspn(array[posicao].nome, "\n")] = '\0';
-
-//         fgets(array[posicao].sobrenome, 40, stdin);
-//         array[posicao].sobrenome[strcspn(array[posicao].sobrenome, "\n")] = '\0';
-
-//         scanf("%d", &array[posicao].teleResidencial);
-//         getchar();
-
-//         scanf("%d", &array[posicao].teleTrabalho);
-//         getchar();
-
-//         scanf("%d", &array[posicao].teleCelular);
-//         getchar();
-
-//         array[posicao].ativo = true;
-//     }
-// }
 
 void removerContato(int total, struct Contato array[])
 {
     char nome[20];
     printf("\nInforme o nome do contato para remover: ");
-    scanf("%s", &nome);
+    scanf("%19s", nome);
 
     for (int i = 0; i < total; i++)
     {
-        if (nome == array[i].nome)
+        if (array[i].ativo == true && strcmp(nome, array[i].nome) == 0)
         {
-            printf("\nContato removido -> %s\n", array[i].nome);
+            printf("Contato removido -> %s\n", array[i].nome);
             array[i].ativo = false;
-
             return;
         }
     }
@@ -306,11 +224,9 @@ int main()
     struct Contato contatos[total];
 
     preencherContatos(0, total, contatos);
-
     printf("\n");
 
     imprimirContatos(0, total, contatos);
-
     printf("\n");
 
     bubbleSort(total, contatos);
