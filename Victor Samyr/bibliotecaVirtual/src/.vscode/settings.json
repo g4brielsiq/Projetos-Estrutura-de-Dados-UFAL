@@ -1,0 +1,8 @@
+{
+  "code-runner.executorMap": {
+    "c": "gcc $fileName -o $fileNameWithoutExt $(pkg-config --cflags --libs gtk+-3.0 gstreamer-1.0) && ./$fileNameWithoutExt"
+  },
+  "files.associations": {
+    "gst.h": "c"
+  }
+}
