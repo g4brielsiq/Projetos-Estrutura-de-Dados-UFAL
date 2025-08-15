@@ -203,7 +203,7 @@ void removerContato(int total, struct Contato array[])
 
     for (int i = 0; i < total; i++)
     {
-        if (array[i].ativo == true && strcmp(nome, array[i].nome) == 0)
+        if (strcmp(nome, array[i].nome) == 0 && array[i].ativo == true)
         {
             printf("Contato removido -> %s\n", array[i].nome);
             array[i].ativo = false;
