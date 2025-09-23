@@ -1,0 +1,34 @@
+As particularidades do projeto BigPapo são:
+
+- A rede de lanchonetes deve atender qualquer pedido em no máximo 5 minutos, mantendo o sabor característico.
+
+- Os processos de pedido, separação de itens e preparo precisam estar bem planejados para evitar perdas financeiras.
+
+- Tempos de preparo dos itens:
+  - Batata frita: 3 minutos e 10 segundos
+  - Sanduíche simples: 58 segundos
+  - Sanduíche médio: 1 minuto e 28 segundos
+  - Sanduíche elaborado: 1 minuto e 45 segundos
+  - Refrigerante: 5 segundos
+  - Suco: 38 segundos
+  - Milk shake: 1 minuto
+
+- Montagem do pedido em bandeja: máximo de 2 itens de comida e 2 itens de bebida por pedido, em no máximo 30 segundos.
+
+- Capacidade máxima dos equipamentos para o nome do aluno "Davi Domingos Oliveira":
+  - Chapa de sanduíches: 3 sanduíches por vez
+  - Peneira de batata frita: 2 porções por vez
+  - Liquidificador de milk shake: 4 copos por vez
+
+- Equipe de 13 funcionários com habilidades diversas, podendo migrar entre tarefas similares:
+  - 5 funcionários que fazem sanduíches (alguns também fazem batata frita ou suco)
+  - 2 funcionários que fazem batata frita (um destes também faz sanduíches)
+  - 2 funcionários que montam bandeja
+  - 2 funcionários que fazem separação dos pedidos (um também caixa e outro também faz sanduíches)
+  - 3 funcionários que fazem caixa e bebidas, com sobreposição de funções
+
+- O orçamento depende do cumprimento do tempo máximo, pois a lanchonete tem política de devolução do dinheiro caso o pedido ultrapasse 5 minutos.
+
+- O objetivo do projeto é minimizar perdas, evitar atrasos, e otimizar a distribuição das tarefas entre os funcionários respeitando suas habilidades e as capacidades dos equipamentos.
+
+Essas são as principais particularidades e restrições que devem guiar o desenvolvimento do código para simular o processo produtivo da lanchonete BigPapo. Posso ajudar com o próximo passo.
