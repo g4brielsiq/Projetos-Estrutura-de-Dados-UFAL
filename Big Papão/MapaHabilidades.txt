@@ -1,0 +1,39 @@
+Funcionário 1 - 
+fazer sanduiche, batata frita, suco.
+
+funcionário 2 - 
+fazer sanduiche, batata frita.
+
+Funcionário 3 - 
+fazer Sanduiche
+
+Funcionário 4 - 
+fazer Sanduiche
+
+Funcionário 5 - 
+fazer Sanduiche
+
+Funcionário 6 -
+fazer Sanduiche, batata frita.
+
+funcionário 7- 
+Fazer batata frita.
+
+Funcionário 8 -
+Fazer Bebidas, Montar Bandeja.
+
+Funcionário 9 -
+Montar Bandeja
+
+Funcionário 10 -
+Separação dos pedidos, ser caixa
+
+Funcionário 11 - 
+Separação dos pedidos, fazer sanduiche
+
+Funcionário 12 -
+Caixa, bebidas
+
+Funcionário 13 -
+Caixa
+
