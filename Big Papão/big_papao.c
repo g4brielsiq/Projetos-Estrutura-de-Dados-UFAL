@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <string.h>
 #define NUM_FUNCIONARIOS 13
 #define MAX_HABILIDADES 3
 
@@ -22,7 +23,7 @@ typedef struct {
     float tempoTotal;
 } Pedido;
 
-Funcionario* mapa_habilidades() {
+Funcionario* MapaHabilidades() {
     static Funcionario equipe[NUM_FUNCIONARIOS] = {
         {1, "Funcionario1", 3, {"sanduiche", "batata_frita", "suco"}, 0},
         {2, "Funcionario2", 2, {"sanduiche", "batata_frita"}, 0},
@@ -41,7 +42,7 @@ Funcionario* mapa_habilidades() {
     return equipe;
 }
 
-void print_funcionarios(Funcionario* quadro) {
+void PrintFuncionarios(Funcionario* quadro) {
 
     printf("\n");
     for (int i = 0; i < NUM_FUNCIONARIOS; i++) {
@@ -59,12 +60,39 @@ void print_funcionarios(Funcionario* quadro) {
     }
 }
 
+int OcuparFuncionarioPorHabilidade(Funcionario* quadro, char* habilidade)
+{
+    for(int i = 0; i < NUM_FUNCIONARIOS; i++)
+    {
+        if(!quadro[i].ocupado)
+        {
+            for(int j; j < quadro[i].num_funcoes;j++)
+            {
+                 if (strcmp(quadro[i].funcoes[j], habilidade) == 0) {
+                    return i; 
+                }
+            }
+        }
+    }
+    return -1;
+}
+void TesteBusca(Funcionario* Quadro)
+{
+    int indice = OcuparFuncionarioPorHabilidade(Quadro, "sanduiche");
+    if (indice != -1) {
+        Quadro[indice].ocupado = 1; 
+        printf("Funcionário %s alocado para preparo de sanduíche.\n", Quadro[indice].nome);
+    } else {
+        printf("Nenhum funcionário disponível para sanduíche.\n");
+    }
+}
 
 int main()
 {
-    Funcionario* Quadro = mapa_habilidades();
-
-    print_funcionarios(Quadro);
+    Funcionario* Quadro = MapaHabilidades();
+    //PrintFuncionarios(Quadro);
+    TesteBusca(Quadro);
+    PrintFuncionarios(Quadro);
 
     return 0;
 }
