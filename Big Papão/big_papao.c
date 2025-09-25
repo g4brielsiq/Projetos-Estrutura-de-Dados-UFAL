@@ -1,8 +1,20 @@
 #include <stdio.h>
 #include <string.h>
 #define NUM_FUNCIONARIOS 13
-#define MAX_HABILIDADES 3
-
+#define MAX_HABILIDADES 2
+// Definição dos tempos de preparo (em segundos):
+#define TEMPO_BATATA_FRITA      190   
+#define TEMPO_SANDUICHE_SIMPLES 58    
+#define TEMPO_SANDUICHE_MEDIO   88    
+#define TEMPO_SANDUICHE_ELAB    105   
+#define TEMPO_REFRIGERANTE      5     
+#define TEMPO_SUCO              38    
+#define TEMPO_MILK_SHAKE        60    
+// Definição de capacidade máxima:
+#define CHAPA 3
+#define FRITADEIRA 2
+#define LIQUIDIFICADOR 4 
+ 
 typedef struct {
     int id;
     char nome[50];
@@ -27,22 +39,20 @@ Funcionario* MapaHabilidades() {
     static Funcionario equipe[NUM_FUNCIONARIOS] = {
         {1, "Funcionario1", 1, {"sanduiche"}, 0},
         {2, "Funcionario2", 1, {"sanduiche"}, 0},
-        {3, "Funcionario3", 1, {"sanduiche"}, 0},
+        {3, "Funcionario3", 1, {"caixa"}, 0},
         {4, "Funcionario4", 1, {"batata_frita"}, 0},
         {5, "Funcionario5", 1, {"montar_bandeja"}, 0},
-        {6, "Funcionario6", 1, {"caixa"}, 0},
+        {6, "Funcionario6", 2, {"sanduiche","suco"}, 0},
         {7, "Funcionario7", 2, {"sanduiche", "batata_frita"}, 0},
         {8, "Funcionario8", 2, {"sanduiche", "batata_frita"}, 0},
         {9, "Funcionario9", 2, {"bebidas", "montar_bandeja"}, 0},
         {10, "Funcionario10", 2, {"separacao", "caixa"}, 0},
         {11, "Funcionario11", 2, {"separacao", "sanduiche"}, 0},
         {12, "Funcionario12", 2, {"caixa", "bebidas"}, 0},
-        {13, "Funcionario13", 3, {"sanduiche", "batata_frita", "suco"}, 0}
+        {13, "Funcionario13", 2, {"sanduiche", "batata_frita"}, 0}
     };
     return equipe;
 }
-
-
 
 void PrintFuncionarios(Funcionario* quadro) {
 
