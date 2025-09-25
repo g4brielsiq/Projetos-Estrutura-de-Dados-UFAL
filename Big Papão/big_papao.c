@@ -42,6 +42,8 @@ Funcionario* MapaHabilidades() {
     return equipe;
 }
 
+
+
 void PrintFuncionarios(Funcionario* quadro) {
 
     printf("\n");
@@ -57,6 +59,48 @@ void PrintFuncionarios(Funcionario* quadro) {
         }
         printf("\nOcupado: %s\n", quadro[i].ocupado ? "Sim" : "Nao");
         printf("------------------------\n");
+    }
+}
+
+void PrintFuncionariosLivres(Funcionario* quadro) {
+
+    printf("\nFuncionarios Livres:\n");
+    for (int i = 0; i < NUM_FUNCIONARIOS; i++) {
+        if(!quadro[i].ocupado)
+        {
+            printf("ID: %d\n", quadro[i].id);
+            printf("Nome: %s\n", quadro[i].nome);
+            printf("Funcoes: ");
+            for (int j = 0; j < quadro[i].num_funcoes; j++) {
+                printf("%s", quadro[i].funcoes[j]);
+                if (j < quadro[i].num_funcoes - 1) {
+                    printf(", ");
+                }
+            }
+            printf("\n------------------------\n");
+        }
+        
+    }
+}
+
+void PrintFuncionariosOcupados(Funcionario* quadro) {
+
+    printf("\nFuncionarios Ocupados:\n");
+    for (int i = 0; i < NUM_FUNCIONARIOS; i++) {
+        if(quadro[i].ocupado)
+        {
+            printf("ID: %d\n", quadro[i].id);
+            printf("Nome: %s\n", quadro[i].nome);
+            printf("Funcoes: ");
+            for (int j = 0; j < quadro[i].num_funcoes; j++) {
+                printf("%s", quadro[i].funcoes[j]);
+                if (j < quadro[i].num_funcoes - 1) {
+                    printf(", ");
+                }
+            }
+            printf("\n------------------------\n");
+        }
+        
     }
 }
 
@@ -93,6 +137,7 @@ int main()
     //PrintFuncionarios(Quadro);
     TesteBusca(Quadro);
     PrintFuncionarios(Quadro);
-
+    PrintFuncionariosOcupados(Quadro);
+    PrintFuncionariosLivres(Quadro);
     return 0;
 }
