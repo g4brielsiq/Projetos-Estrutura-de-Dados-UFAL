@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h> 
 #define NUM_FUNCIONARIOS 13
 #define MAX_HABILIDADES 2
 // Definição dos tempos de preparo (em segundos):
@@ -15,6 +16,7 @@
 #define FRITADEIRA 2
 #define LIQUIDIFICADOR 4 
  
+// Estruturas:
 typedef struct {
     int id;
     char nome[50];
@@ -23,8 +25,8 @@ typedef struct {
     int ocupado;
 } Funcionario;
 
-
 typedef struct {
+    int id;
     int qtdBatataFrita;
     int qtdsanduicheSimples;
     int qtdsanduicheMedio;
@@ -35,6 +37,19 @@ typedef struct {
     float tempoTotal;
 } Pedido;
 
+typedef struct No {
+    Pedido pedido;
+    struct No* proximo;
+} No;
+
+typedef struct Fila {
+    No* inicio;
+    No* fim;
+    int tamanho;
+} Fila;
+
+
+// Funções relacionadas aos funcionários:
 Funcionario* MapaHabilidades() {
     static Funcionario equipe[NUM_FUNCIONARIOS] = {
         {1, "Funcionario1", 1, {"sanduiche"}, 0},
@@ -120,7 +135,7 @@ int OcuparFuncionarioPorHabilidade(Funcionario* quadro, char* habilidade)
     {
         if(!quadro[i].ocupado)
         {
-            for(int j; j < quadro[i].num_funcoes;j++)
+            for(int j=0; j < quadro[i].num_funcoes;j++)
             {
                  if (strcmp(quadro[i].funcoes[j], habilidade) == 0) {
                     return i; 
@@ -141,13 +156,225 @@ void TesteBusca(Funcionario* Quadro)
     }
 }
 
+// Funções de Fila:
+Fila* criar_fila() {
+    Fila* nova_fila = (Fila*) malloc(sizeof(Fila));
+    if (nova_fila != NULL) {
+        nova_fila->inicio = NULL;
+        nova_fila->fim = NULL;
+        nova_fila->tamanho = 0;
+    }
+    return nova_fila;
+}
+
+void enfileirar(Fila* fila, Pedido novo_pedido) {
+    No* novo_no = (No*) malloc(sizeof(No));
+    if (novo_no == NULL) {
+        printf("Erro: Falha na alocacao de memoria para o novo pedido!\n");
+        return;
+    }
+    novo_no->pedido = novo_pedido;
+    novo_no->proximo = NULL;
+
+    if (fila->fim == NULL) { 
+        fila->inicio = novo_no;
+        fila->fim = novo_no;
+    } else { 
+        fila->fim->proximo = novo_no;
+        fila->fim = novo_no;
+    }
+    fila->tamanho++;
+}
+
+Pedido desenfileirar(Fila* fila) {
+    Pedido pedido_vazio = {0};
+    if (fila->inicio == NULL) {
+        printf("Aviso: A fila de pedidos esta vazia!\n");
+        return pedido_vazio; 
+    }
+
+    No* no_removido = fila->inicio;
+    Pedido pedido_retornado = no_removido->pedido;
+
+    fila->inicio = fila->inicio->proximo;
+    if (fila->inicio == NULL) { 
+        fila->fim = NULL;
+    }
+
+    free(no_removido);
+    fila->tamanho--;
+
+    return pedido_retornado;
+}
+
+void liberar_fila(Fila* fila) {
+    No* atual = fila->inicio;
+    while (atual != NULL) {
+        No* proximo_no = atual->proximo;
+        free(atual);
+        atual = proximo_no;
+    }
+    free(fila);
+}
+
+// Funções menu:
+static int proximo_id_pedido = 1; // Contador global para o ID do pedido
+
+void imprimir_pedido(Pedido p) {
+    // Verifica se o pedido é válido (se tem algum item)
+    if (p.id == 0) {
+        printf("Pedido invalido ou vazio.\n");
+        return;
+    }
+
+    printf("\n--- Detalhes do Pedido ID: %d ---\n", p.id);
+    printf("Tempo Total Estimado: %.0f segundos\n", p.tempoTotal);
+    printf("Itens do Pedido:\n");
+
+    if (p.qtdBatataFrita > 0) {
+        printf("  - Batata Frita: %d\n", p.qtdBatataFrita);
+    }
+    if (p.qtdsanduicheSimples > 0) {
+        printf("  - Sanduiche Simples: %d\n", p.qtdsanduicheSimples);
+    }
+    if (p.qtdsanduicheMedio > 0) {
+        printf("  - Sanduiche Medio: %d\n", p.qtdsanduicheMedio);
+    }
+    if (p.qtdsanduicheElab > 0) {
+        printf("  - Sanduiche Elaborado: %d\n", p.qtdsanduicheElab);
+    }
+    if (p.qtdRefrigerante > 0) {
+        printf("  - Refrigerante: %d\n", p.qtdRefrigerante);
+    }
+    if (p.qtdSuco > 0) {
+        printf("  - Suco: %d\n", p.qtdSuco);
+    }
+    if (p.qtdMilkShake > 0) {
+        printf("  - Milk Shake: %d\n", p.qtdMilkShake);
+    }
+    printf("----------------------------------\n\n");
+}
+
+
+void adicionar_pedido_menu(Fila* fila) {
+    Pedido novo_pedido = {0}; // Inicializa todos os campos com 0
+    int escolha = -1;
+    
+    novo_pedido.id = proximo_id_pedido++;
+
+    printf("\n--- Adicionar Novo Pedido (ID: %d) ---\n", novo_pedido.id);
+    do
+    {
+        int quantidade = 0;
+        puts("----------- CARDAPIO -----------");
+        puts("Por favor escolha o item a ser pedido:");
+        puts("1- Batata Frita");
+        puts("2- Sanduiche Simples");
+        puts("3- Sanduiche Medio");
+        puts("4- Sanduiche Elaborado");
+        puts("5- Refrigerante");
+        puts("6- Suco");
+        puts("7- Milk Shake");
+        puts("0- Sair");
+        puts("------------------------------");
+        printf("Número do Item: ");
+        scanf("%d",&escolha);
+        switch(escolha)
+        {
+            case 1:
+                printf("Quantidade de Batata Frita: ");
+                scanf("%d", &quantidade);
+                novo_pedido.qtdBatataFrita += quantidade;
+                printf("%d un. de Batata Frita adicionadas.\n\n", quantidade);
+                break;
+            case 2:
+                printf("Quantidade de Sanduiche Simples: ");
+                scanf("%d", &quantidade);
+                novo_pedido.qtdsanduicheSimples += quantidade;
+                printf("%d un. de Sanduiche Simples adicionados.\n\n", quantidade);
+                break;
+            case 3:
+                printf("Quantidade de Sanduiche Medio: ");
+                scanf("%d", &quantidade);
+                novo_pedido.qtdsanduicheMedio += quantidade;
+                printf("%d un. de Sanduiche Medio adicionados.\n\n", quantidade);
+                break;
+            case 4:
+                printf("Quantidade de Sanduiche Elaborado: ");
+                scanf("%d", &quantidade);
+                novo_pedido.qtdsanduicheElab += quantidade;
+                printf("%d un. de Sanduiche Elaborado adicionados.\n\n", quantidade);
+                break;
+            case 5:
+                printf("Quantidade de Refrigerante: ");
+                scanf("%d", &quantidade);
+                novo_pedido.qtdRefrigerante += quantidade;
+                printf("%d un. de Refrigerante adicionados.\n\n", quantidade);
+                break;
+            case 6:
+                printf("Quantidade de Suco: ");
+                scanf("%d", &quantidade);
+                novo_pedido.qtdSuco += quantidade;
+                printf("%d un. de Suco adicionados.\n\n", quantidade);
+                break;
+            case 7:
+                printf("Quantidade de Milk Shake: ");
+                scanf("%d", &quantidade);
+                novo_pedido.qtdMilkShake += quantidade;
+                printf("%d un. de Milk Shake adicionados.\n\n", quantidade);
+                break;
+            case 0:
+                enfileirar(fila, novo_pedido);
+                printf("Finalizando adicao de itens...\n");
+                break;
+            default:
+                
+                printf("Opcao invalida! Por favor, escolha um item do menu.\n\n");
+                break;
+        }
+
+    } while (escolha != 0);
+    puts("----------- PEDIDO -----------");
+    imprimir_pedido(novo_pedido);
+}
+
+
 int main()
 {
+    
+    int escolha = -1;
+    Fila* fila_de_pedidos = criar_fila();
     Funcionario* Quadro = MapaHabilidades();
     //PrintFuncionarios(Quadro);
-    TesteBusca(Quadro);
-    PrintFuncionarios(Quadro);
-    PrintFuncionariosOcupados(Quadro);
-    PrintFuncionariosLivres(Quadro);
+    //TesteBusca(Quadro);
+    //PrintFuncionarios(Quadro);
+    //PrintFuncionariosOcupados(Quadro);
+    //PrintFuncionariosLivres(Quadro);
+    do {
+        printf("========== MENU RESTAURANTE ==========\n");
+        printf("1. Adicionar novo pedido a fila\n");
+        printf("2. Visualizar fila de pedidos\n");
+        printf("0. Sair\n");
+        printf("======================================\n");
+        printf("Escolha uma opcao: ");
+        scanf("%d", &escolha);
+
+        switch (escolha) {
+            case 1:
+                adicionar_pedido_menu(fila_de_pedidos);
+                break;
+            case 2:
+                puts("A ser implementada");
+                break;
+            case 0:
+                printf("\nEncerrando o sistema...\n");
+                break;
+            default:
+                printf("\nOpcao invalida! Tente novamente.\n\n");
+                break;
+        }
+
+    } while (escolha != 0);
+    liberar_fila(fila_de_pedidos);
     return 0;
 }
