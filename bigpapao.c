@@ -3,495 +3,472 @@
 #include <string.h>
 #include <time.h>
 
-// Definição dos tempos de preparo em segundos
-#define TEMPO_BATATA 190
-#define TEMPO_SANDUICHE_SIMPLES 58
-#define TEMPO_SANDUICHE_MEDIO 88
-#define TEMPO_SANDUICHE_ELABORADO 105
-#define TEMPO_REFRIGERANTE 5
-#define TEMPO_SUCO 38
-#define TEMPO_MILKSHAKE 60
-#define TEMPO_MONTAGEM 30
-#define TEMPO_MAXIMO_ATENDIMENTO 300 // 5 minutos em segundos
+// Definições em português para estruturas de dados
+// Tipos de itens
+typedef enum {
+    BATATA_FRITA,
+    SANDUINCHE_SIMPLES,
+    SANDUINCHE_MEDIO,
+    SANDUINCHE_ELABORADO,
+    REFRIGERANTE,
+    SUCO,
+    MILK_SHAKE
+} TipoItem;
 
-// Estruturas de dados
-typedef struct {
-    int id;
-    char tipo[20];
-    int tempo_preparo;
-    int tempo_chegada;
-    int tempo_inicio_preparo;
-    int tempo_conclusao;
-} Sanduiche;
+// Habilidades dos funcionários (usando bitmask para simplicidade)
+typedef enum {
+    HABILIDADE_SANDUICHE = 1 << 0,
+    HABILIDADE_BATATA = 1 << 1,
+    HABILIDADE_SUCOS = 1 << 2,
+    HABILIDADE_BEBDAS = 1 << 3,
+    HABILIDADE_MONTAGEM = 1 << 4,
+    HABILIDADE_SEPARACAO = 1 << 5,
+    HABILIDADE_CAIXA = 1 << 6
+} Habilidade;
 
-typedef struct {
-    int id;
-    int tempo_preparo;
-    int tempo_chegada;
-    int tempo_inicio_preparo;
-    int tempo_conclusao;
-} BatataFrita;
+// Struct para Item do pedido
+typedef struct Item {
+    TipoItem tipo;
+    int quantidade;
+    int tempoPreparo; // Calculado baseado no tipo
+    struct Item* proximo;
+} Item;
 
-typedef struct {
+// Struct para Pedido (fila de itens)
+typedef struct Pedido {
     int id;
-    char tipo[20];
-    int tempo_preparo;
-    int tempo_chegada;
-    int tempo_inicio_preparo;
-    int tempo_conclusao;
-} Bebida;
-
-typedef struct {
-    int id;
-    Sanduiche* sanduiche;
-    BatataFrita* batata;
-    Bebida* bebida1;
-    Bebida* bebida2;
-    int tempo_chegada;
-    int tempo_conclusao;
-    int atrasado;
+    int tempoChegada; // Em segundos
+    Item* itens; // Lista ligada de itens
+    int tempoTotalPreparo; // Tempo estimado total
+    int tempoMontagem; // 30s fixo se aplicável
+    int entregue; // 1 se entregue em 5 min, 0 caso contrário
+    struct Pedido* proximo;
 } Pedido;
 
-typedef struct NoFila {
-    Pedido* pedido;
-    struct NoFila* proximo;
-} NoFila;
+// Struct para Funcionário
+typedef struct Funcionario {
+    int id;
+    unsigned int habilidades; // Bitmask de habilidades
+    int ocupadoAte; // Tempo em que fica livre (em segundos)
+    struct Funcionario* proximo;
+} Funcionario;
 
-typedef struct {
-    NoFila* inicio;
-    NoFila* fim;
+// Struct para Fila de Pedidos (usando lista ligada como fila)
+typedef struct FilaPedidos {
+    Pedido* inicio;
+    Pedido* fim;
     int tamanho;
 } FilaPedidos;
 
-typedef struct {
-    int id;
-    char habilidades[5][30];
-    int num_habilidades;
-    int ocupado;
-    Pedido* pedido_atual;
-    int tempo_termino;
-} Funcionario;
+// Struct para Lista de Funcionários Disponíveis
+typedef struct ListaFuncionarios {
+    Funcionario* inicio;
+    int tamanho;
+} ListaFuncionarios;
 
-typedef struct {
-    char tipo[30];
-    int capacidade_maxima;
-    int em_uso;
-    int tempo_termino;
-} Equipamento;
+// Nomes dos itens para exibição
+char* nomesItens[] = {
+    "Batata Frita",
+    "Sanduiche Simples",
+    "Sanduiche Medio",
+    "Sanduiche Elaborado",
+    "Refrigerante",
+    "Suco",
+    "Milk Shake"
+};
 
-// Protótipos das funções
-FilaPedidos* criar_fila();
-void enfileirar(FilaPedidos* fila, Pedido* pedido);
-Pedido* desenfileirar(FilaPedidos* fila);
-int fila_vazia(FilaPedidos* fila);
+// Tempos de preparo em segundos (conforme especificação)
+int temposPreparo[] = {
+    190, // BATATA_FRITA
+    58,  // SANDUINCHE_SIMPLES
+    88,  // SANDUINCHE_MEDIO
+    105, // SANDUINCHE_ELABORADO
+    5,   // REFRIGERANTE
+    38,  // SUCO
+    60   // MILK_SHAKE
+};
 
-void inicializar_funcionarios(Funcionario funcionarios[]);
-void inicializar_equipamentos(Equipamento equipamentos[]);
-Pedido* criar_pedido_pre_definido(int id, int caso, int tempo_atual);
-void processar_pedidos(FilaPedidos* fila_pedidos, Funcionario funcionarios[], Equipamento equipamentos[], int tempo_atual);
-void simular_casos_pre_definidos();
+// Limites de preparo simultâneo
+#define MAX_SANDUICHES_CHAPA 3
+#define MAX_BATATAS_PENEIRA 2
+#define MAX_MILK_SHAKES_LIQUIDIFICADOR 4
+#define TEMPO_MAX_ATENDIMENTO 300 // 5 minutos em segundos
+#define TEMPO_MONTAGEM 30
 
-int main() {
-    srand(time(NULL));
-    printf("=== SIMULADOR BIGPAPÃO LANCHONETE - CASOS PRÉ-DEFINIDOS ===\n\n");
-    simular_casos_pre_definidos();
-    return 0;
-}
-
-// Implementação das funções da fila
-FilaPedidos* criar_fila() {
+// Funções para manipular fila de pedidos
+FilaPedidos* criarFilaPedidos() {
     FilaPedidos* fila = (FilaPedidos*)malloc(sizeof(FilaPedidos));
-    fila->inicio = fila->fim = NULL;
+    fila->inicio = NULL;
+    fila->fim = NULL;
     fila->tamanho = 0;
     return fila;
 }
 
-void enfileirar(FilaPedidos* fila, Pedido* pedido) {
-    NoFila* novo_no = (NoFila*)malloc(sizeof(NoFila));
-    novo_no->pedido = pedido;
-    novo_no->proximo = NULL;
-    
-    if (fila->fim == NULL) {
-        fila->inicio = fila->fim = novo_no;
+void enfileirarPedido(FilaPedidos* fila, Pedido* pedido) {
+    if (!fila->inicio) {
+        fila->inicio = pedido;
+        fila->fim = pedido;
     } else {
-        fila->fim->proximo = novo_no;
-        fila->fim = novo_no;
+        fila->fim->proximo = pedido;
+        fila->fim = pedido;
     }
     fila->tamanho++;
+    pedido->proximo = NULL;
 }
 
-Pedido* desenfileirar(FilaPedidos* fila) {
-    if (fila->inicio == NULL) return NULL;
-    
-    NoFila* temp = fila->inicio;
-    Pedido* pedido = temp->pedido;
+Pedido* desenfileirarPedido(FilaPedidos* fila) {
+    if (!fila->inicio) return NULL;
+    Pedido* pedido = fila->inicio;
     fila->inicio = fila->inicio->proximo;
-    
-    if (fila->inicio == NULL) {
-        fila->fim = NULL;
-    }
-    
-    free(temp);
     fila->tamanho--;
+    if (!fila->inicio) fila->fim = NULL;
     return pedido;
 }
 
-int fila_vazia(FilaPedidos* fila) {
-    return fila->inicio == NULL;
+// Função para criar item
+Item* criarItem(TipoItem tipo, int quantidade) {
+    Item* item = (Item*)malloc(sizeof(Item));
+    item->tipo = tipo;
+    item->quantidade = quantidade;
+    item->tempoPreparo = temposPreparo[tipo] * quantidade;
+    item->proximo = NULL;
+    return item;
 }
 
-void inicializar_funcionarios(Funcionario funcionarios[]) {
-    // 5 funcionários habilitados a fazer sanduíches
-    for (int i = 0; i < 5; i++) {
-        funcionarios[i].id = i + 1;
-        funcionarios[i].num_habilidades = 1;
-        strcpy(funcionarios[i].habilidades[0], "sanduiche");
-        funcionarios[i].ocupado = 0;
-        funcionarios[i].pedido_atual = NULL;
-        funcionarios[i].tempo_termino = 0;
-    }
-    
-    strcpy(funcionarios[0].habilidades[1], "batata");
-    strcpy(funcionarios[1].habilidades[1], "batata");
-    funcionarios[0].num_habilidades = funcionarios[1].num_habilidades = 2;
-    
-    strcpy(funcionarios[2].habilidades[1], "bebida");
-    funcionarios[2].num_habilidades = 2;
-    
-    // 2 funcionários habilitados a fazer batatas fritas
-    funcionarios[5].id = 6;
-    strcpy(funcionarios[5].habilidades[0], "batata");
-    funcionarios[5].num_habilidades = 1;
-    funcionarios[5].ocupado = 0;
-    
-    funcionarios[6].id = 7;
-    strcpy(funcionarios[6].habilidades[0], "batata");
-    strcpy(funcionarios[6].habilidades[1], "sanduiche");
-    funcionarios[6].num_habilidades = 2;
-    funcionarios[6].ocupado = 0;
-    
-    // 1 funcionário habilitado a fazer bebidas
-    funcionarios[7].id = 8;
-    strcpy(funcionarios[7].habilidades[0], "bebida");
-    strcpy(funcionarios[7].habilidades[1], "montagem");
-    funcionarios[7].num_habilidades = 2;
-    funcionarios[7].ocupado = 0;
-    
-    // 1 funcionário habilitado a montar bandeja
-    funcionarios[8].id = 9;
-    strcpy(funcionarios[8].habilidades[0], "montagem");
-    funcionarios[8].num_habilidades = 1;
-    funcionarios[8].ocupado = 0;
-    
-    // 2 funcionários habilitados a separar pedidos
-    funcionarios[9].id = 10;
-    strcpy(funcionarios[9].habilidades[0], "separacao");
-    strcpy(funcionarios[9].habilidades[1], "caixa");
-    funcionarios[9].num_habilidades = 2;
-    funcionarios[9].ocupado = 0;
-    
-    funcionarios[10].id = 11;
-    strcpy(funcionarios[10].habilidades[0], "separacao");
-    strcpy(funcionarios[10].habilidades[1], "sanduiche");
-    funcionarios[10].num_habilidades = 2;
-    funcionarios[10].ocupado = 0;
-    
-    // 2 funcionários habilitados a ser caixa
-    funcionarios[11].id = 12;
-    strcpy(funcionarios[11].habilidades[0], "caixa");
-    strcpy(funcionarios[11].habilidades[1], "bebida");
-    funcionarios[11].num_habilidades = 2;
-    funcionarios[11].ocupado = 0;
-    
-    funcionarios[12].id = 13;
-    strcpy(funcionarios[12].habilidades[0], "caixa");
-    funcionarios[12].num_habilidades = 1;
-    funcionarios[12].ocupado = 0;
-}
-
-void inicializar_equipamentos(Equipamento equipamentos[]) {
-    strcpy(equipamentos[0].tipo, "chapa_sanduiche");
-    equipamentos[0].capacidade_maxima = 3;
-    equipamentos[0].em_uso = 0;
-    equipamentos[0].tempo_termino = 0;
-    
-    strcpy(equipamentos[1].tipo, "peneira_batata");
-    equipamentos[1].capacidade_maxima = 2;
-    equipamentos[1].em_uso = 0;
-    equipamentos[1].tempo_termino = 0;
-    
-    strcpy(equipamentos[2].tipo, "liquidificador_milkshake");
-    equipamentos[2].capacidade_maxima = 4;
-    equipamentos[2].em_uso = 0;
-    equipamentos[2].tempo_termino = 0;
-}
-
-Pedido* criar_pedido_pre_definido(int id, int caso, int tempo_atual) {
-    Pedido* pedido = (Pedido*)malloc(sizeof(Pedido));
-    pedido->id = id;
-    pedido->tempo_chegada = tempo_atual;
-    pedido->atrasado = 0;
-    
-    printf("\n=== CRIANDO PEDIDO %d - CASO %d ===\n", id, caso);
-    
-    switch(caso) {
-        case 1: // Pedido simples - dentro do prazo
-            printf("Caso 1: Pedido SIMPLES (dentro do prazo)\n");
-            printf("- Sanduíche simples + Refrigerante\n");
-            
-            pedido->sanduiche = (Sanduiche*)malloc(sizeof(Sanduiche));
-            pedido->sanduiche->id = id * 10 + 1;
-            strcpy(pedido->sanduiche->tipo, "simples");
-            pedido->sanduiche->tempo_preparo = TEMPO_SANDUICHE_SIMPLES;
-            pedido->sanduiche->tempo_chegada = tempo_atual;
-            
-            pedido->batata = NULL;
-            
-            pedido->bebida1 = (Bebida*)malloc(sizeof(Bebida));
-            pedido->bebida1->id = id * 10 + 2;
-            strcpy(pedido->bebida1->tipo, "refrigerante");
-            pedido->bebida1->tempo_preparo = TEMPO_REFRIGERANTE;
-            pedido->bebida1->tempo_chegada = tempo_atual;
-            
-            pedido->bebida2 = NULL;
-            break;
-            
-        case 2: // Pedido médio - limite do prazo
-            printf("Caso 2: Pedido MÉDIO (limite do prazo)\n");
-            printf("- Sanduíche médio + Batata + Suco\n");
-            
-            pedido->sanduiche = (Sanduiche*)malloc(sizeof(Sanduiche));
-            pedido->sanduiche->id = id * 10 + 1;
-            strcpy(pedido->sanduiche->tipo, "medio");
-            pedido->sanduiche->tempo_preparo = TEMPO_SANDUICHE_MEDIO;
-            pedido->sanduiche->tempo_chegada = tempo_atual;
-            
-            pedido->batata = (BatataFrita*)malloc(sizeof(BatataFrita));
-            pedido->batata->id = id * 10 + 2;
-            pedido->batata->tempo_preparo = TEMPO_BATATA;
-            pedido->batata->tempo_chegada = tempo_atual;
-            
-            pedido->bebida1 = (Bebida*)malloc(sizeof(Bebida));
-            pedido->bebida1->id = id * 10 + 3;
-            strcpy(pedido->bebida1->tipo, "suco");
-            pedido->bebida1->tempo_preparo = TEMPO_SUCO;
-            pedido->bebida1->tempo_chegada = tempo_atual;
-            
-            pedido->bebida2 = NULL;
-            break;
-            
-        case 3: // Pedido complexo - provável atraso
-            printf("Caso 3: Pedido COMPLEXO (provável atraso)\n");
-            printf("- Sanduíche elaborado + Batata + Milk Shake\n");
-            
-            pedido->sanduiche = (Sanduiche*)malloc(sizeof(Sanduiche));
-            pedido->sanduiche->id = id * 10 + 1;
-            strcpy(pedido->sanduiche->tipo, "elaborado");
-            pedido->sanduiche->tempo_preparo = TEMPO_SANDUICHE_ELABORADO;
-            pedido->sanduiche->tempo_chegada = tempo_atual;
-            
-            pedido->batata = (BatataFrita*)malloc(sizeof(BatataFrita));
-            pedido->batata->id = id * 10 + 2;
-            pedido->batata->tempo_preparo = TEMPO_BATATA;
-            pedido->batata->tempo_chegada = tempo_atual;
-            
-            pedido->bebida1 = (Bebida*)malloc(sizeof(Bebida));
-            pedido->bebida1->id = id * 10 + 3;
-            strcpy(pedido->bebida1->tipo, "milkshake");
-            pedido->bebida1->tempo_preparo = TEMPO_MILKSHAKE;
-            pedido->bebida1->tempo_chegada = tempo_atual;
-            
-            pedido->bebida2 = NULL;
-            break;
-            
-        case 4: // Pedido familiar - muito complexo
-            printf("Caso 4: Pedido FAMILIAR (muito complexo)\n");
-            printf("- 2 Sanduíches elaborados + Batata + 2 Milk Shakes\n");
-            
-            pedido->sanduiche = (Sanduiche*)malloc(sizeof(Sanduiche));
-            pedido->sanduiche->id = id * 10 + 1;
-            strcpy(pedido->sanduiche->tipo, "elaborado");
-            pedido->sanduiche->tempo_preparo = TEMPO_SANDUICHE_ELABORADO;
-            pedido->sanduiche->tempo_chegada = tempo_atual;
-            
-            pedido->batata = (BatataFrita*)malloc(sizeof(BatataFrita));
-            pedido->batata->id = id * 10 + 2;
-            pedido->batata->tempo_preparo = TEMPO_BATATA;
-            pedido->batata->tempo_chegada = tempo_atual;
-            
-            pedido->bebida1 = (Bebida*)malloc(sizeof(Bebida));
-            pedido->bebida1->id = id * 10 + 3;
-            strcpy(pedido->bebida1->tipo, "milkshake");
-            pedido->bebida1->tempo_preparo = TEMPO_MILKSHAKE;
-            pedido->bebida1->tempo_chegada = tempo_atual;
-            
-            pedido->bebida2 = (Bebida*)malloc(sizeof(Bebida));
-            pedido->bebida2->id = id * 10 + 4;
-            strcpy(pedido->bebida2->tipo, "milkshake");
-            pedido->bebida2->tempo_preparo = TEMPO_MILKSHAKE;
-            pedido->bebida2->tempo_chegada = tempo_atual;
-            break;
-            
-        case 5: // Pedido rápido - certamente no prazo
-            printf("Caso 5: Pedido RÁPIDO (certamente no prazo)\n");
-            printf("- Sanduíche simples + Refrigerante (sem batata)\n");
-            
-            pedido->sanduiche = (Sanduiche*)malloc(sizeof(Sanduiche));
-            pedido->sanduiche->id = id * 10 + 1;
-            strcpy(pedido->sanduiche->tipo, "simples");
-            pedido->sanduiche->tempo_preparo = TEMPO_SANDUICHE_SIMPLES;
-            pedido->sanduiche->tempo_chegada = tempo_atual;
-            
-            pedido->batata = NULL;
-            
-            pedido->bebida1 = (Bebida*)malloc(sizeof(Bebida));
-            pedido->bebida1->id = id * 10 + 2;
-            strcpy(pedido->bebida1->tipo, "refrigerante");
-            pedido->bebida1->tempo_preparo = TEMPO_REFRIGERANTE;
-            pedido->bebida1->tempo_chegada = tempo_atual;
-            
-            pedido->bebida2 = NULL;
-            break;
-    }
-    
-    // Calcular tempo estimado do pedido
-    int tempo_total = TEMPO_MONTAGEM;
-    if (pedido->sanduiche) tempo_total += pedido->sanduiche->tempo_preparo;
-    if (pedido->batata) tempo_total += pedido->batata->tempo_preparo;
-    if (pedido->bebida1) tempo_total += pedido->bebida1->tempo_preparo;
-    if (pedido->bebida2) tempo_total += pedido->bebida2->tempo_preparo;
-    
-    printf("Tempo estimado: %d segundos | Prazo: %d segundos\n", 
-           tempo_total, TEMPO_MAXIMO_ATENDIMENTO);
-    printf("Previsão: %s\n\n", 
-           tempo_total > TEMPO_MAXIMO_ATENDIMENTO ? "ATRASO" : "DENTRO DO PRAZO");
-    
-    return pedido;
-}
-
-void processar_pedidos(FilaPedidos* fila_pedidos, Funcionario funcionarios[], Equipamento equipamentos[], int tempo_atual) {
-    // Verificar funcionários livres e alocar tarefas
-    for (int i = 0; i < 13; i++) {
-        if (!funcionarios[i].ocupado && !fila_vazia(fila_pedidos)) {
-            Pedido* pedido = desenfileirar(fila_pedidos);
-            funcionarios[i].ocupado = 1;
-            funcionarios[i].pedido_atual = pedido;
-            
-            // Calcular tempo total do pedido
-            int tempo_total = TEMPO_MONTAGEM;
-            if (pedido->sanduiche) tempo_total += pedido->sanduiche->tempo_preparo;
-            if (pedido->batata) tempo_total += pedido->batata->tempo_preparo;
-            if (pedido->bebida1) tempo_total += pedido->bebida1->tempo_preparo;
-            if (pedido->bebida2) tempo_total += pedido->bebida2->tempo_preparo;
-            
-            funcionarios[i].tempo_termino = tempo_atual + tempo_total;
-            pedido->tempo_conclusao = funcionarios[i].tempo_termino;
-            
-            // Verificar se vai atrasar
-            pedido->atrasado = (pedido->tempo_conclusao - pedido->tempo_chegada > TEMPO_MAXIMO_ATENDIMENTO);
-            
-            printf("⏱️  Funcionário %d iniciou pedido %d\n", funcionarios[i].id, pedido->id);
-            printf("   Chegada: %ds | Término previsto: %ds | Duração: %ds\n", 
-                   pedido->tempo_chegada, funcionarios[i].tempo_termino, tempo_total);
+// Função para adicionar item ao pedido
+void adicionarItem(Pedido* pedido, Item* item) {
+    if (!pedido->itens) {
+        pedido->itens = item;
+    } else {
+        Item* atual = pedido->itens;
+        while (atual->proximo) {
+            atual = atual->proximo;
         }
+        atual->proximo = item;
     }
-    
-    // Liberar funcionários que terminaram
-    for (int i = 0; i < 13; i++) {
-        if (funcionarios[i].ocupado && tempo_atual >= funcionarios[i].tempo_termino) {
-            Pedido* pedido = funcionarios[i].pedido_atual;
-            int tempo_total = pedido->tempo_conclusao - pedido->tempo_chegada;
-            
-            printf("\n✅ PEDIDO %d CONCLUÍDO:\n", pedido->id);
-            printf("   Tempo total: %d segundos\n", tempo_total);
-            printf("   Status: %s\n", pedido->atrasado ? "❌ ATRASADO (reembolso devido)" : "✅ DENTRO DO PRAZO");
-            printf("   Funcionário %d liberado\n\n", funcionarios[i].id);
-            
-            // Liberar memória
-            free(pedido->sanduiche);
-            if (pedido->batata) free(pedido->batata);
-            free(pedido->bebida1);
-            if (pedido->bebida2) free(pedido->bebida2);
-            free(pedido);
-            
-            funcionarios[i].ocupado = 0;
-            funcionarios[i].pedido_atual = NULL;
-        }
-    }
+    pedido->tempoTotalPreparo += item->tempoPreparo;
 }
 
-void simular_casos_pre_definidos() {
-    FilaPedidos* fila_pedidos = criar_fila();
-    Funcionario funcionarios[13];
-    Equipamento equipamentos[3];
-    
-    inicializar_funcionarios(funcionarios);
-    inicializar_equipamentos(equipamentos);
-    
-    int tempo_simulacao = 1000; // 1000 segundos de simulação
-    int pedidos_criados = 0;
-    int pedidos_concluidos = 0;
-    int pedidos_atrasados = 0;
-    
-    printf("🎯 SIMULAÇÃO COM 5 CASOS PRÉ-DEFINIDOS\n");
-    printf("=========================================\n\n");
-    
-    // Criar os 5 casos predefinidos em tempos específicos
-    int tempos_chegada[] = {0, 100, 200, 300, 400}; // Chegada espaçada
-    
-    for (int i = 0; i < 5; i++) {
-        Pedido* pedido = criar_pedido_pre_definido(i + 1, i + 1, tempos_chegada[i]);
-        enfileirar(fila_pedidos, pedido);
-        pedidos_criados++;
+// Função para imprimir o conteúdo de um pedido
+void imprimirPedido(Pedido* pedido) {
+    printf("Processando Pedido %d (chegada em %d s): ", pedido->id, pedido->tempoChegada);
+    Item* atual = pedido->itens;
+    if (!atual) {
+        printf("Vazio\n");
+        return;
     }
-    
-    printf("📊 INICIANDO PROCESSAMENTO DOS PEDIDOS...\n\n");
-    
-    for (int tempo_atual = 0; tempo_atual < tempo_simulacao; tempo_atual++) {
-        // Processar pedidos a cada segundo
-        processar_pedidos(fila_pedidos, funcionarios, equipamentos, tempo_atual);
-        
-        // Contar pedidos concluídos
-        for (int i = 0; i < 13; i++) {
-            if (funcionarios[i].ocupado && tempo_atual == funcionarios[i].tempo_termino) {
-                pedidos_concluidos++;
-                if (funcionarios[i].pedido_atual && funcionarios[i].pedido_atual->atrasado) {
-                    pedidos_atrasados++;
-                }
+    while (atual) {
+        printf("%s x%d", nomesItens[atual->tipo], atual->quantidade);
+        if (atual->proximo) printf(", ");
+        atual = atual->proximo;
+    }
+    printf("\n");
+}
+
+// Função para calcular tempo de montagem (simplificado: 30s se aplicável)
+int calcularTempoMontagem(Item* itens) {
+    int itensComer = 0, itensBeber = 0;
+    Item* atual = itens;
+    while (atual) {
+        if (atual->tipo == BATATA_FRITA || (atual->tipo >= SANDUINCHE_SIMPLES && atual->tipo <= SANDUINCHE_ELABORADO)) {
+            itensComer += atual->quantidade;
+        } else {
+            itensBeber += atual->quantidade;
+        }
+        atual = atual->proximo;
+    }
+    // Verifica limite da bandeja: max 2 comer + 2 beber
+    if (itensComer > 2 || itensBeber > 2) {
+        return -1; // Inválido
+    }
+    return TEMPO_MONTAGEM;
+}
+
+// Função para criar lista de funcionários (13 conforme especificação)
+ListaFuncionarios* criarFuncionarios() {
+    ListaFuncionarios* lista = (ListaFuncionarios*)malloc(sizeof(ListaFuncionarios));
+    lista->inicio = NULL;
+    lista->tamanho = 0;
+
+    Funcionario* funcs[13];
+    int i;
+    for (i = 0; i < 13; i++) {
+        funcs[i] = (Funcionario*)malloc(sizeof(Funcionario));
+        funcs[i]->id = i + 1;
+        funcs[i]->ocupadoAte = 0;
+        funcs[i]->proximo = NULL;
+    }
+
+    // 5 sanduíches básicos
+    for (i = 0; i < 5; i++) {
+        funcs[i]->habilidades = HABILIDADE_SANDUICHE;
+    }
+    // 2 deles também batata
+    funcs[0]->habilidades |= HABILIDADE_BATATA;
+    funcs[1]->habilidades |= HABILIDADE_BATATA;
+    // 1 também sucos (usando um dos sanduíches)
+    funcs[2]->habilidades |= HABILIDADE_SUCOS;
+
+    // 2 batata adicionais (um já coberto acima)
+    funcs[5]->habilidades = HABILIDADE_BATATA;
+    funcs[6]->habilidades = HABILIDADE_BATATA | HABILIDADE_SANDUICHE;
+
+    // 1 bebidas também montagem
+    funcs[7]->habilidades = HABILIDADE_BEBDAS | HABILIDADE_MONTAGEM;
+
+    // 1 montagem
+    funcs[8]->habilidades = HABILIDADE_MONTAGEM;
+
+    // 2 separação
+    funcs[9]->habilidades = HABILIDADE_SEPARACAO | HABILIDADE_CAIXA;
+    funcs[10]->habilidades = HABILIDADE_SEPARACAO | HABILIDADE_SANDUICHE;
+
+    // 2 caixa
+    funcs[11]->habilidades = HABILIDADE_CAIXA;
+    funcs[12]->habilidades = HABILIDADE_CAIXA | HABILIDADE_BEBDAS;
+
+    // Adiciona à lista
+    for (i = 0; i < 13; i++) {
+        if (!lista->inicio) {
+            lista->inicio = funcs[i];
+        } else {
+            Funcionario* atual = lista->inicio;
+            while (atual->proximo) atual = atual->proximo;
+            atual->proximo = funcs[i];
+        }
+        lista->tamanho++;
+    }
+
+    return lista;
+}
+
+// Função para encontrar funcionário disponível com habilidade necessária
+Funcionario* encontrarFuncionario(ListaFuncionarios* lista, unsigned int habilidadeNecessaria, int tempoAtual) {
+    Funcionario* atual = lista->inicio;
+    Funcionario* candidato = NULL;
+    int menorOcupado = -1;
+
+    while (atual) {
+        if ((atual->habilidades & habilidadeNecessaria) && atual->ocupadoAte <= tempoAtual) {
+            if (menorOcupado == -1 || atual->ocupadoAte < menorOcupado) {
+                candidato = atual;
+                menorOcupado = atual->ocupadoAte;
             }
         }
-        
-        // Parar se todos os pedidos foram concluídos
-        if (pedidos_concluidos >= 5 && fila_vazia(fila_pedidos)) {
-            printf("\n🎉 TODOS OS PEDIDOS FORAM CONCLUÍDOS!\n");
+        atual = atual->proximo;
+    }
+    return candidato;
+}
+
+// Função para alocar funcionário a uma tarefa
+int alocarFuncionario(Funcionario* func, int tempoTarefa, int tempoAtual) {
+    if (func && func->ocupadoAte <= tempoAtual) {
+        func->ocupadoAte = tempoAtual + tempoTarefa;
+        return 1;
+    }
+    return 0;
+}
+
+// Função para processar um item (simplificado, considerando limites)
+int processarItem(Item* item, ListaFuncionarios* lista, int tempoAtual, int* tempoProcessado) {
+    unsigned int habilidadeNecessaria;
+    int capacidadeMax = 1; // Padrão
+
+    switch (item->tipo) {
+        case BATATA_FRITA:
+            habilidadeNecessaria = HABILIDADE_BATATA;
+            capacidadeMax = MAX_BATATAS_PENEIRA;
             break;
+        case SANDUINCHE_SIMPLES:
+        case SANDUINCHE_MEDIO:
+        case SANDUINCHE_ELABORADO:
+            habilidadeNecessaria = HABILIDADE_SANDUICHE;
+            capacidadeMax = MAX_SANDUICHES_CHAPA;
+            break;
+        case REFRIGERANTE:
+        case SUCO:
+        case MILK_SHAKE:
+            habilidadeNecessaria = HABILIDADE_BEBDAS;
+            if (item->tipo == MILK_SHAKE) capacidadeMax = MAX_MILK_SHAKES_LIQUIDIFICADOR;
+            break;
+        default:
+            return 0;
+    }
+
+    // Verifica se quantidade excede capacidade (processa em lotes)
+    int lotes = (item->quantidade + capacidadeMax - 1) / capacidadeMax;
+    *tempoProcessado = (temposPreparo[item->tipo] * lotes); // Tempo por lote (simplificado)
+
+    Funcionario* func = encontrarFuncionario(lista, habilidadeNecessaria, tempoAtual);
+    if (func && alocarFuncionario(func, *tempoProcessado, tempoAtual)) {
+        return 1;
+    }
+    return 0; // Não pôde alocar
+}
+
+// Função principal de simulação
+void simularCozinha(FilaPedidos* filaPedidos, ListaFuncionarios* listaFuncs) {
+    int tempoAtual = 0;
+    int perdas = 0;
+    int atendidos = 0;
+
+    printf("=== INÍCIO DA SIMULAÇÃO DA COZINHA ===\n");
+
+    while (filaPedidos->tamanho > 0) {
+        Pedido* pedido = desenfileirarPedido(filaPedidos);
+        imprimirPedido(pedido);
+        int tempoInicio = tempoAtual;
+
+        // Ajusta tempo atual para chegada do pedido (se atrasado)
+        if (pedido->tempoChegada > tempoAtual) {
+            tempoAtual = pedido->tempoChegada;
         }
-    }
-    
-    // Relatório final detalhado
-    printf("\n📈 RELATÓRIO FINAL DETALHADO\n");
-    printf("===============================\n");
-    printf("Total de pedidos criados: %d\n", pedidos_criados);
-    printf("Total de pedidos concluídos: %d\n", pedidos_concluidos);
-    printf("Pedidos atrasados: %d\n", pedidos_atrasados);
-    printf("Taxa de sucesso: %.1f%%\n", ((pedidos_criados - pedidos_atrasados) * 100.0) / pedidos_criados);
-    
-    if (pedidos_atrasados > 0) {
-        printf("\n💸 PREJUÍZO ESTIMADO POR ATRASOS:\n");
-        printf("   Supondo valor médio de R$ 25,00 por pedido:\n");
-        printf("   Prejuízo total: R$ %.2f\n", pedidos_atrasados * 25.0);
-    }
-    
-    // Liberar memória de pedidos não processados
-    while (!fila_vazia(fila_pedidos)) {
-        Pedido* pedido = desenfileirar(fila_pedidos);
-        free(pedido->sanduiche);
-        if (pedido->batata) free(pedido->batata);
-        free(pedido->bebida1);
-        if (pedido->bebida2) free(pedido->bebida2);
+
+        pedido->tempoMontagem = calcularTempoMontagem(pedido->itens);
+        if (pedido->tempoMontagem == -1) {
+            printf("  -> Pedido %d inválido: excede limite da bandeja (mais de 2 itens para comer ou beber). ATRASADO/Perda!\n", pedido->id);
+            perdas++;
+            // Libera itens
+            Item* atualItem = pedido->itens;
+            while (atualItem) {
+                Item* temp = atualItem;
+                atualItem = atualItem->proximo;
+                free(temp);
+            }
+            free(pedido);
+            continue;
+        }
+
+        // Processa cada item sequencialmente (simplificado)
+        Item* atualItem = pedido->itens;
+        int sucesso = 1;
+        int tempoPreparoTotal = 0;
+        while (atualItem) {
+            int tempoItem;
+            if (!processarItem(atualItem, listaFuncs, tempoAtual, &tempoItem)) {
+                printf("  -> Falha ao processar %s no Pedido %d (sem funcionário disponível). ATRASADO/Perda!\n", nomesItens[atualItem->tipo], pedido->id);
+                sucesso = 0;
+                break;
+            }
+            tempoPreparoTotal += tempoItem;
+            tempoAtual += tempoItem; // Avança tempo por item (sem paralelismo total)
+            atualItem = atualItem->proximo;
+        }
+
+        int tempoTotal = 0;
+        if (sucesso) {
+            // Adiciona montagem
+            Funcionario* funcMontagem = encontrarFuncionario(listaFuncs, HABILIDADE_MONTAGEM, tempoAtual);
+            if (funcMontagem && alocarFuncionario(funcMontagem, pedido->tempoMontagem, tempoAtual)) {
+                tempoAtual += pedido->tempoMontagem;
+                tempoTotal = tempoAtual - tempoInicio;
+            } else {
+                printf("  -> Falha na montagem do Pedido %d (sem funcionário para bandeja). ATRASADO/Perda!\n", pedido->id);
+                sucesso = 0;
+            }
+        }
+
+        if (sucesso && tempoTotal <= TEMPO_MAX_ATENDIMENTO) {
+            pedido->entregue = 1;
+            atendidos++;
+            printf("  -> Pedido %d ATENDIDO em %d segundos (dentro dos 5 minutos).\n", pedido->id, tempoTotal);
+        } else if (sucesso) {
+            pedido->entregue = 0;
+            perdas++;
+            printf("  -> Pedido %d ATRASADO: tempo total %d segundos > 300s.\n", pedido->id, tempoTotal);
+        }
+
+        // Avança tempo para simular intervalo entre processamentos (se houver mais pedidos)
+        if (filaPedidos->tamanho > 0) {
+            tempoAtual += 10; // Pequeno intervalo
+        }
+
+        // Libera itens do pedido
+        atualItem = pedido->itens;
+        while (atualItem) {
+            Item* temp = atualItem;
+            atualItem = atualItem->proximo;
+            free(temp);
+        }
         free(pedido);
+        printf("\n");
     }
-    free(fila_pedidos);
-    
-    printf("\n🏁 SIMULAÇÃO CONCLUÍDA!\n");
+
+    printf("=== FIM DA SIMULAÇÃO ===\n");
+    printf("Pedidos Atendidos: %d\n", atendidos);
+    printf("Pedidos Atrasados/Perdas: %d\n", perdas);
+}
+
+// Função principal
+int main() {
+    srand(time(NULL));
+
+    // Cria fila de pedidos de exemplo (6 pedidos variados para cobrir casos)
+    FilaPedidos* fila = criarFilaPedidos();
+    ListaFuncionarios* funcs = criarFuncionarios();
+
+    // Pedido 1: Simples - 1 batata, 1 sanduiche simples, 1 refrigerante (deve atender)
+    Pedido* p1 = (Pedido*)malloc(sizeof(Pedido));
+    p1->id = 1;
+    p1->tempoChegada = 0;
+    p1->itens = NULL;
+    p1->tempoTotalPreparo = 0;
+    p1->tempoMontagem = 0;
+    p1->entregue = 0;
+    adicionarItem(p1, criarItem(BATATA_FRITA, 1));
+    adicionarItem(p1, criarItem(SANDUINCHE_SIMPLES, 1));
+    adicionarItem(p1, criarItem(REFRIGERANTE, 1));
+    enfileirarPedido(fila, p1);
+
+    // Pedido 2: Médio - 2 sanduiches médios, 1 suco (deve atender)
+    Pedido* p2 = (Pedido*)malloc(sizeof(Pedido));
+    p2->id = 2;
+    p2->tempoChegada = 60; // Chega após 1 min
+    p2->itens = NULL;
+    p2->tempoTotalPreparo = 0;
+    p2->tempoMontagem = 0;
+    p2->entregue = 0;
+    adicionarItem(p2, criarItem(SANDUINCHE_MEDIO, 2));
+    adicionarItem(p2, criarItem(SUCO, 1));
+    enfileirarPedido(fila, p2);
+
+    // Pedido 3: Com milk shake - 1 milk shake, 1 sanduiche elaborado (deve atender)
+    Pedido* p3 = (Pedido*)malloc(sizeof(Pedido));
+    p3->id = 3;
+    p3->tempoChegada = 120; // Chega após 2 min
+    p3->itens = NULL;
+    p3->tempoTotalPreparo = 0;
+    p3->tempoMontagem = 0;
+    p3->entregue = 0;
+    adicionarItem(p3, criarItem(MILK_SHAKE, 1));
+    adicionarItem(p3, criarItem(SANDUINCHE_ELABORADO, 1));
+    enfileirarPedido(fila, p3);
+
+    // Pedido 4: Complexo - 2 batatas, 3 sanduiches simples, 2 refrigerantes (excede bandeja: 5 comer >2, atrasado)
+    Pedido* p4 = (Pedido*)malloc(sizeof(Pedido));
+    p4->id = 4;
+    p4->tempoChegada = 180; // Chega após 4 min
+    p4->itens = NULL;
+    p4->tempoTotalPreparo = 0;
+    p4->tempoMontagem = 0;
+    p4->entregue = 0;
+    adicionarItem(p4, criarItem(BATATA_FRITA, 2));
+    adicionarItem(p4, criarItem(SANDUINCHE_SIMPLES, 3));
+    adicionarItem(p4, criarItem(REFRIGERANTE, 2));
+    enfileirarPedido(fila, p4);
+
+    // Executa simulação
+    simularCozinha(fila, funcs);
+
+    // Libera memória dos funcionários (simplificado)
+    Funcionario* atualFunc = funcs->inicio;
+    while (atualFunc) {
+        Funcionario* temp = atualFunc;
+        atualFunc = atualFunc->proximo;
+        free(temp);
+    }
+    free(funcs);
+    free(fila);
+
+    return 0;
 }
