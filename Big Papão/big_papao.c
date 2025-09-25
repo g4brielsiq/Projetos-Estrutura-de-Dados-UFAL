@@ -150,9 +150,9 @@ void TesteBusca(Funcionario* Quadro)
     int indice = OcuparFuncionarioPorHabilidade(Quadro, "sanduiche");
     if (indice != -1) {
         Quadro[indice].ocupado = 1; 
-        printf("Funcionário %s alocado para preparo de sanduíche.\n", Quadro[indice].nome);
+        printf(" %s alocado para preparo de sanduiche.\n", Quadro[indice].nome);
     } else {
-        printf("Nenhum funcionário disponível para sanduíche.\n");
+        printf("Nenhum funcionario disponivel para sanduíche.\n");
     }
 }
 
@@ -277,7 +277,7 @@ void adicionar_pedido_menu(Fila* fila) {
         puts("7- Milk Shake");
         puts("0- Sair");
         puts("------------------------------");
-        printf("Número do Item: ");
+        printf("Numero do Item: ");
         scanf("%d",&escolha);
         switch(escolha)
         {
@@ -324,8 +324,21 @@ void adicionar_pedido_menu(Fila* fila) {
                 printf("%d un. de Milk Shake adicionados.\n\n", quantidade);
                 break;
             case 0:
-                enfileirar(fila, novo_pedido);
-                printf("Finalizando adicao de itens...\n");
+                if (novo_pedido.qtdBatataFrita == 0 && 
+                    novo_pedido.qtdsanduicheSimples == 0 && 
+                    novo_pedido.qtdsanduicheMedio == 0 && 
+                    novo_pedido.qtdsanduicheElab == 0 && 
+                    novo_pedido.qtdRefrigerante == 0 && 
+                    novo_pedido.qtdSuco == 0 && 
+                    novo_pedido.qtdMilkShake == 0) 
+                {
+                    printf("\nO pedido esta vazio! Nenhum item foi adicionado.\n");
+                }
+                else{
+                    enfileirar(fila, novo_pedido);
+                    printf("Finalizando adicao de itens...\n");
+                }
+                
                 break;
             default:
                 
@@ -338,6 +351,24 @@ void adicionar_pedido_menu(Fila* fila) {
     imprimir_pedido(novo_pedido);
 }
 
+void visualizar_fila(Fila* fila) {
+    if (fila->inicio == NULL) {
+        printf("\nA fila de pedidos esta vazia.\n\n");
+        return;
+    }
+
+    printf("\n--- Fila de Pedidos (Total: %d) ---\n", fila->tamanho);
+
+    No* atual = fila->inicio;
+
+    while (atual != NULL) {
+        imprimir_pedido(atual->pedido);
+        atual = atual->proximo;
+    }
+
+    printf("--- Fim da Fila ---\n\n");
+}
+
 
 int main()
 {
@@ -346,7 +377,9 @@ int main()
     Fila* fila_de_pedidos = criar_fila();
     Funcionario* Quadro = MapaHabilidades();
     //PrintFuncionarios(Quadro);
-    //TesteBusca(Quadro);
+    printf("\n\n");
+    TesteBusca(Quadro);
+    printf("\n\n");
     //PrintFuncionarios(Quadro);
     //PrintFuncionariosOcupados(Quadro);
     //PrintFuncionariosLivres(Quadro);
@@ -354,6 +387,8 @@ int main()
         printf("========== MENU RESTAURANTE ==========\n");
         printf("1. Adicionar novo pedido a fila\n");
         printf("2. Visualizar fila de pedidos\n");
+        printf("3. Ver funcionarios livres\n");
+        printf("4. Ver funcionarios ocupados\n");
         printf("0. Sair\n");
         printf("======================================\n");
         printf("Escolha uma opcao: ");
@@ -364,14 +399,20 @@ int main()
                 adicionar_pedido_menu(fila_de_pedidos);
                 break;
             case 2:
-                puts("A ser implementada");
+                visualizar_fila(fila_de_pedidos);
+                break;
+            case 3:
+                PrintFuncionariosLivres(Quadro);
+                break;
+            case 4: 
+                PrintFuncionariosOcupados(Quadro);
                 break;
             case 0:
                 printf("\nEncerrando o sistema...\n");
                 break;
             default:
                 printf("\nOpcao invalida! Tente novamente.\n\n");
-                break;
+                break;printf("\n\n");
         }
 
     } while (escolha != 0);
