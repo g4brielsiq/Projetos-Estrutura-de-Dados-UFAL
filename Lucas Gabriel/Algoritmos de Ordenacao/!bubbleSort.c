@@ -59,7 +59,7 @@ int main()
     printf("\nPreencha o vetor: ");
     preencherArray(0, total, array);
 
-    printf("\nVetor desordenado:");
+    printf("\nVetor original:");
     imprimirArray(0, total, array);
     printf("\n");
 

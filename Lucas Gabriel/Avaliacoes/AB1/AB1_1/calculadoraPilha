@@ -1,0 +1,155 @@
+ALGORITMO CalculadoraComPilha
+TIPO
+    No = REGISTRO
+        valor: REAL
+        proximo: PONTEIRO PARA No
+    FIM_REGISTRO
+
+VARIÁVEIS
+    topo: PONTEIRO PARA No
+    expressao: STRING
+    resultado: REAL
+
+PROCEDIMENTO InicializarPilha()
+    topo ← NULO
+FIM_PROCEDIMENTO
+
+FUNÇÃO PilhaVazia(): BOOLEANO
+    RETORNAR topo = NULO
+FIM_FUNÇÃO
+
+PROCEDIMENTO Empilhar(valor: REAL)
+    VAR novo_no: PONTEIRO PARA No
+    ALOCAR(novo_no)
+    novo_no^.valor ← valor
+    novo_no^.proximo ← topo
+    topo ← novo_no
+FIM_PROCEDIMENTO
+
+FUNÇÃO Desempilhar(): REAL
+    SE PilhaVazia() ENTÃO
+        ESCREVER "Erro: Pilha vazia"
+        RETORNAR 0
+    SENÃO
+        VAR temp: PONTEIRO PARA No
+        VAR valor: REAL
+        temp ← topo
+        valor ← temp^.valor
+        topo ← topo^.proximo
+        LIBERAR(temp)
+        RETORNAR valor
+    FIM_SE
+FIM_FUNÇÃO
+
+FUNÇÃO CalcularRadical(indice, base, expoente: REAL): REAL
+    // Calcula a raiz: (base^expoente)^(1/indice)
+    RETORNAR (base ^ expoente) ^ (1 / indice)
+FIM_FUNÇÃO
+
+FUNÇÃO ProcessarExpressao(expr: STRING): REAL
+    VAR i: INTEIRO
+    VAR numero_atual: STRING
+    VAR esperando_operador: BOOLEANO
+    VAR ultimo_caracter: CARACTER
+    
+    InicializarPilha()
+    i ← 1
+    numero_atual ← ""
+    esperando_operador ← FALSO
+    
+    ENQUANTO i <= COMPRIMENTO(expr) FAÇA
+        SE expr[i] = '(' ENTÃO
+            // Processar radical: (indice,base,expoente)
+            VAR indice, base, expoente: REAL
+            VAR temp_str: STRING
+            VAR contador_virgulas: INTEIRO
+            
+            i ← i + 1 // Pular '('
+            contador_virgulas ← 0
+            temp_str ← ""
+            
+            ENQUANTO expr[i] ≠ ')' FAÇA
+                SE expr[i] = ',' ENTÃO
+                    SE contador_virgulas = 0 ENTÃO
+                        indice ← CONVERTER_PARA_REAL(temp_str)
+                    SENÃO SE contador_virgulas = 1 ENTÃO
+                        base ← CONVERTER_PARA_REAL(temp_str)
+                    FIM_SE
+                    temp_str ← ""
+                    contador_virgulas ← contador_virgulas + 1
+                    i ← i + 1
+                SENÃO
+                    temp_str ← temp_str + expr[i]
+                    i ← i + 1
+                FIM_SE
+            FIM_ENQUANTO
+            
+            expoente ← CONVERTER_PARA_REAL(temp_str)
+            i ← i + 1 // Pular ')'
+            
+            VAR resultado_radical: REAL
+            resultado_radical ← CalcularRadical(indice, base, expoente)
+            Empilhar(resultado_radical)
+            esperando_operador ← VERDADEIRO
+            
+        SENÃO SE expr[i] ∈ {'+', '-', '*', '/'} E esperando_operador ENTÃO
+            // Guardar operador na pilha
+            Empilhar(CODIGO_OPERADOR(expr[i])) // Usar código especial para operadores
+            esperando_operador ← FALSO
+            i ← i + 1
+            
+        SENÃO SE expr[i] = ' ' ENTÃO
+            i ← i + 1 // Ignorar espaços
+            
+        SENÃO
+            ESCREVER "Erro: Expressão inválida"
+            RETORNAR 0
+        FIM_SE
+    FIM_ENQUANTO
+    
+    // Resolver expressão na pilha (notação polonesa reversa)
+    RETORNAR ResolverExpressaoPilha()
+FIM_FUNÇÃO
+
+FUNÇÃO ResolverExpressaoPilha(): REAL
+    VAR pilha_aux: PILHA DE REAL
+    InicializarPilhaAuxiliar(pilha_aux)
+    
+    ENQUANTO ¬PilhaVazia() FAÇA
+        VAR elemento: REAL
+        elemento ← Desempilhar()
+        
+        SE elemento É OPERADOR ENTÃO
+            VAR operando2, operando1: REAL
+            operando2 ← DesempilharDaAuxiliar(pilha_aux)
+            operando1 ← DesempilharDaAuxiliar(pilha_aux)
+            
+            ESCOLHA elemento
+                CASO CODIGO_MAIS: EmpilharNaAuxiliar(pilha_aux, operando1 + operando2)
+                CASO CODIGO_MENOS: EmpilharNaAuxiliar(pilha_aux, operando1 - operando2)
+                CASO CODIGO_VEZES: EmpilharNaAuxiliar(pilha_aux, operando1 * operando2)
+                CASO CODIGO_DIVIDIR: 
+                    SE operando2 = 0 ENTÃO
+                        ESCREVER "Erro: Divisão por zero"
+                        RETORNAR 0
+                    SENÃO
+                        EmpilharNaAuxiliar(pilha_aux, operando1 / operando2)
+                    FIM_SE
+            FIM_ESCOLHA
+        SENÃO
+            EmpilharNaAuxiliar(pilha_aux, elemento)
+        FIM_SE
+    FIM_ENQUANTO
+    
+    RETORNAR DesempilharDaAuxiliar(pilha_aux)
+FIM_FUNÇÃO
+
+// Programa principal
+INÍCIO
+    ESCREVER "Digite a expressão matemática:"
+    LER expressao
+    
+    resultado ← ProcessarExpressao(expressao)
+    
+    ESCREVER "Resultado: ", resultado
+FIM
