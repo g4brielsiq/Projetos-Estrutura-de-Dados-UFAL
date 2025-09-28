@@ -1,3 +1,8 @@
+// Merge Sort (Ordenação por Divisão e Conquista)
+// - Divide o vetor em duas metades recursivamente
+// - Ordena cada metade
+// - Junta as metades ordenadas
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -24,54 +29,79 @@ void imprimirArray(int x, int total, int array[])
     return;
 }
 
-// Função auxiliar para mesclar duas metades ordenadas
-void merge(int array[], int esquerda, int meio, int direita)
+// Função para mesclar duas metades do vetor
+void merge(int vetor[], int inicio, int meio, int fim)
 {
-    int n1 = meio - esquerda + 1;
-    int n2 = direita - meio;
+    int n1 = meio - inicio + 1;
+    int n2 = fim - meio;
 
+    // Vetores temporários para cada metade
     int L[n1], R[n2];
 
+    // Copia os dados para os vetores temporários
     for (int i = 0; i < n1; i++)
-        L[i] = array[esquerda + i];
+        L[i] = vetor[inicio + i];
     for (int j = 0; j < n2; j++)
-        R[j] = array[meio + 1 + j];
+        R[j] = vetor[meio + 1 + j];
 
-    int i = 0, j = 0, k = esquerda;
+    int i = 0, j = 0, k = inicio;
 
+    // Junta os elementos das duas metades em ordem
     while (i < n1 && j < n2)
     {
         if (L[i] <= R[j])
-            array[k++] = L[i++];
+        {
+            vetor[k] = L[i];
+            i++;
+        }
         else
-            array[k++] = R[j++];
+        {
+            vetor[k] = R[j];
+            j++;
+        }
+        k++;
     }
 
+    // Copia os elementos restantes de L, se houver
     while (i < n1)
-        array[k++] = L[i++];
-
-    while (j < n2)
-        array[k++] = R[j++];
-}
-
-// Merge Sort recursivo
-void mergeSort(int array[], int esquerda, int direita)
-{
-    if (esquerda < direita)
     {
-        int meio = esquerda + (direita - esquerda) / 2;
+        vetor[k] = L[i];
+        i++;
+        k++;
+    }
 
-        mergeSort(array, esquerda, meio);
-        mergeSort(array, meio + 1, direita);
-
-        merge(array, esquerda, meio, direita);
+    // Copia os elementos restantes de R, se houver
+    while (j < n2)
+    {
+        vetor[k] = R[j];
+        j++;
+        k++;
     }
 }
 
+// Função principal do Merge Sort (recursiva)
+void mergeSort(int vetor[], int inicio, int fim)
+{
+    if (inicio < fim)
+    {
+        int meio = inicio + (fim - inicio) / 2;
+
+        // Ordena primeira metade
+        mergeSort(vetor, inicio, meio);
+        // Ordena segunda metade
+        mergeSort(vetor, meio + 1, fim);
+        // Mescla as duas metades ordenadas
+        merge(vetor, inicio, meio, fim);
+    }
+}
+
+// Programa principal
 int main()
 {
+    system("cls");
+
     int total;
-    printf("\nInforme o tamanho do vetor: ");
+    printf("Informe o tamanho do vetor: ");
     scanf("%d", &total);
 
     int array[total];
@@ -79,7 +109,7 @@ int main()
     printf("\nPreencha o vetor: ");
     preencherArray(0, total, array);
 
-    printf("\nVetor desordenado:");
+    printf("\nVetor original:");
     imprimirArray(0, total, array);
     printf("\n");
 
@@ -87,6 +117,7 @@ int main()
 
     printf("\nVetor ordenado:");
     imprimirArray(0, total, array);
+    printf("\n");
 
     return 0;
 }
