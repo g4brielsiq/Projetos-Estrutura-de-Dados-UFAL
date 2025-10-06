@@ -120,20 +120,22 @@ void inicializar_cozinha(Cozinha *cozinha)
            cozinha->fritadeira.capacidade_por_funcionario,
            cozinha->liquidificador.capacidade_por_funcionario);
 
-    // Mapeamento CORRETO dos 13 funcionários conforme o PDF
-    cozinha->funcionarios[0] = (Funcionario){1, HABILIDADE_SANDUICHE, 0};
-    cozinha->funcionarios[1] = (Funcionario){2, HABILIDADE_SANDUICHE, 0};
-    cozinha->funcionarios[2] = (Funcionario){3, HABILIDADE_SANDUICHE | HABILIDADE_BATATA, 0};
-    cozinha->funcionarios[3] = (Funcionario){4, HABILIDADE_SANDUICHE | HABILIDADE_BATATA, 0};
-    cozinha->funcionarios[4] = (Funcionario){5, HABILIDADE_SANDUICHE | HABILIDADE_SUCO, 0};
-    cozinha->funcionarios[5] = (Funcionario){6, HABILIDADE_BATATA, 0};
-    cozinha->funcionarios[6] = (Funcionario){7, HABILIDADE_BATATA | HABILIDADE_SANDUICHE, 0};
-    cozinha->funcionarios[7] = (Funcionario){8, HABILIDADE_BEBIDAS | HABILIDADE_MONTAGEM, 0}; // Bebidas genéricas + montagem
+    // Mapeamento dos 13 funcionários e suas habilidades
+    // (ID, HABILIDADES, LIVRE_A_PARTIR_DE)
+
+    cozinha->funcionarios[0] = (Funcionario){1, HABILIDADE_SANDUICHE | HABILIDADE_BATATA, 0};
+    cozinha->funcionarios[1] = (Funcionario){2, HABILIDADE_SANDUICHE | HABILIDADE_BATATA, 0};
+    cozinha->funcionarios[2] = (Funcionario){3, HABILIDADE_SANDUICHE | HABILIDADE_BEBIDAS, 0};
+    cozinha->funcionarios[3] = (Funcionario){4, HABILIDADE_SANDUICHE, 0};
+    cozinha->funcionarios[4] = (Funcionario){5, HABILIDADE_SANDUICHE, 0};
+    cozinha->funcionarios[5] = (Funcionario){6, HABILIDADE_SANDUICHE | HABILIDADE_BATATA, 0};
+    cozinha->funcionarios[6] = (Funcionario){7, HABILIDADE_BATATA, 0};
+    cozinha->funcionarios[7] = (Funcionario){8, HABILIDADE_BEBIDAS | HABILIDADE_MONTAGEM, 0};
     cozinha->funcionarios[8] = (Funcionario){9, HABILIDADE_MONTAGEM, 0};
-    cozinha->funcionarios[9] = (Funcionario){10, HABILIDADE_SANDUICHE, 0};  // Habilidade de separação/caixa não produtiva
-    cozinha->funcionarios[10] = (Funcionario){11, HABILIDADE_SANDUICHE, 0}; // Habilidade de separação não produtiva
-    cozinha->funcionarios[11] = (Funcionario){12, 0, 0};                    // Caixa não produtivo
-    cozinha->funcionarios[12] = (Funcionario){13, HABILIDADE_BEBIDAS, 0};   // Caixa + Bebidas
+    cozinha->funcionarios[9] = (Funcionario){10, 0 | 0, 0};                     // Habilidade de (separação / caixa ) ---> não produtiva
+    cozinha->funcionarios[10] = (Funcionario){11, 0 | HABILIDADE_SANDUICHE, 0}; // Habilidade de sanduiche / (separação) --> não produtiva
+    cozinha->funcionarios[11] = (Funcionario){12, 0 | HABILIDADE_BEBIDAS, 0};   // Habilidade de bebidas / (caixa) --> não produtiva
+    cozinha->funcionarios[12] = (Funcionario){13, 0, 0};                        // Habilidade de (caixa) --> não produtiva
 }
 
 void adicionar_pedido_na_fila_espera(Cozinha *c, Pedido *novo_pedido)
@@ -175,6 +177,7 @@ void limpar_cozinha(Cozinha *c)
 // =============================================================================
 // 3. MENU INTERATIVO PARA COLETAR PEDIDOS
 // =============================================================================
+
 void coletar_pedidos_do_usuario(Cozinha *c)
 {
     int num_pedidos_iniciais;
@@ -202,10 +205,28 @@ void coletar_pedidos_do_usuario(Cozinha *c)
 
             if (escolha >= 1 && escolha <= 7)
             {
-                qtd_itens++;
-                itens_do_pedido = (TipoItem *)realloc(itens_do_pedido, sizeof(TipoItem) * qtd_itens);
-                itens_do_pedido[qtd_itens - 1] = (TipoItem)(escolha - 1);
-                printf(">> '%s' adicionado ao pedido.\n\n", NOMES_ITENS[escolha - 1]);
+                // --- ALTERAÇÃO 1: Pedir a quantidade ---
+                int quantidade;
+                printf("Digite a quantidade do item: ");
+                scanf("%d", &quantidade);
+
+                // Validação simples para evitar quantidades negativas ou zero
+                if (quantidade < 1)
+                {
+                    printf("Quantidade invalida, adicionando 1 unidade.\n");
+                    quantidade = 1;
+                }
+
+                // --- ALTERAÇÃO 2: Adicionar em lote com um loop 'for' ---
+                for (int k = 0; k < quantidade; k++)
+                {
+                    qtd_itens++;
+                    itens_do_pedido = (TipoItem *)realloc(itens_do_pedido, sizeof(TipoItem) * qtd_itens);
+                    itens_do_pedido[qtd_itens - 1] = (TipoItem)(escolha - 1);
+                }
+
+                // --- ALTERAÇÃO 3: Mensagem de confirmação atualizada ---
+                printf(">> (%d) - '%s' adicionado(s) ao pedido.\n\n", quantidade, NOMES_ITENS[escolha - 1]);
             }
             else if (escolha != 0)
             {
@@ -424,6 +445,7 @@ void executar_simulacao(Cozinha *cozinha)
 // =============================================================================
 int main()
 {
+    system("cls");
     Cozinha cozinha;
     inicializar_cozinha(&cozinha);
     coletar_pedidos_do_usuario(&cozinha);
