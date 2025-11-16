@@ -1,16 +1,12 @@
 /*
-  Simulação de cozinha (duas lojas + CSV + Tempo Global + next-event)
-  - ÚNICA ENTRADA: arquivo CSV no formato tempo_global,destino,q1..q7 (ver exemplo abaixo).
-  - tempo_global = segundo desde a abertura em que o pedido foi feito (timestamp de chegada).
-  - destino = 1 (Loja 1) ou 2 (Loja 2).
-  - q1..q7 = quantidades dos 7 itens do cardápio, na ordem de NOMES_ITENS.
-  - A simulação por loja usa avanço por próximo evento: min(chegada, término de tarefa).
+  Simulação de cozinha (duas lojas simultâneas + CSV + Tempo Global + next-event com ritmo 10:1)
+  - ÚNICA ENTRADA: arquivo CSV no formato tempo_global,destino,q1..q7 (ver exemplo no final).
+  - Todos os logs começam com "[Loja X] " no início de cada linha.
+  - Motor “próximo evento” conjunto: o relógio pula para o menor entre próxima chegada ou conclusão em QUALQUER loja.
+  - Ritmo real: para cada delta de tempo simulado, dorme (delta / 10) segundos (10 s sim = 1 s real).
 
   Compilação sugerida:
-    gcc -std=c11 -Wall -Wextra -Wpedantic -O2 bigpapao.c -o bigpapao
-
-  Execução:
-    ./bigpapao pedidos.csv
+    gcc -std=c11 -Wall -Wextra -Wpedantic -O2 -o bigpapao bigpapao.c
 */
 
 #include <stdio.h>
@@ -20,9 +16,25 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <errno.h>
+#include <stdarg.h>
+
+#define SIM_TO_REAL_SCALE 10  // 10 segundos de simulação = 1 segundo real
+
+#ifdef _WIN32
+  #include <windows.h>
+  static void sleep_ms(unsigned ms) { Sleep(ms); } // milissegundos
+#else
+  #include <time.h>
+  static void sleep_ms(unsigned ms) {
+      struct timespec ts;
+      ts.tv_sec  = ms / 1000u;
+      ts.tv_nsec = (long)(ms % 1000u) * 1000000L;
+      nanosleep(&ts, NULL);
+  }
+#endif
 
 /* =============================================================================
-   0. FUNÇÕES UTILITÁRIAS
+   0. UTILITÁRIOS
    ============================================================================= */
 
 static int safe_realloc_array(void **pp, size_t count, size_t elem_size) {
@@ -33,8 +45,14 @@ static int safe_realloc_array(void **pp, size_t count, size_t elem_size) {
     return 0;
 }
 
+/* prefixo de log por loja: [Loja X]  */
+static void logf_loja(int loja, const char *fmt, ...) {
+    printf("[Loja %d] ", loja);
+    va_list ap; va_start(ap, fmt); vprintf(fmt, ap); va_end(ap);
+}
+
 /* =============================================================================
-   1. DEFINIÇÕES E ESTRUTURAS DE DADOS
+   1. DEFINIÇÕES
    ============================================================================= */
 
 #define NUM_FUNCIONARIOS 13
@@ -88,7 +106,7 @@ typedef struct Pedido {
     int tarefas_preparo_restantes;
     TipoItem *itens;
     int num_itens;
-    struct Pedido *proximo;
+    struct Pedido *proximo;          // lista ligada (chegadas ordenadas)
 } Pedido;
 
 typedef struct {
@@ -110,7 +128,7 @@ typedef struct Cozinha {
     Equipamento fritadeira;
     Equipamento liquidificador;
 
-    Pedido *pedidos_na_fila_espera;      // lista ligada ordenada por tempo_chegada asc
+    Pedido *pedidos_na_fila_espera;      // lista ordenada por tempo_chegada asc
     Pedido **pedidos_em_andamento;
     int num_pedidos_em_andamento;
     Tarefa *tarefas_na_fila_preparo;
@@ -136,6 +154,7 @@ static int item_e_bebida(TipoItem t) {
 void inicializar_cozinha(Cozinha *cozinha, int loja) {
     memset(cozinha, 0, sizeof(Cozinha));
     cozinha->loja = loja;
+
     cozinha->chapa.capacidade_por_funcionario = 3;
     cozinha->fritadeira.capacidade_por_funcionario = 2;
     cozinha->fritadeira.validade_produto_min = 60;
@@ -180,23 +199,21 @@ void limpar_cozinha(Cozinha *c) {
     free(c->pedidos_em_andamento);
     Pedido *atual = c->pedidos_na_fila_espera;
     while (atual != NULL) {
-        Pedido *temp = atual;
-        atual = atual->proximo;
-        free(temp->itens);
-        free(temp);
+        Pedido *tmp = atual; atual = atual->proximo;
+        free(tmp->itens); free(tmp);
     }
 }
 
 /* =============================================================================
-   3. IMPRESSÃO E BUSCAS
+   3. IMPRESSÃO
    ============================================================================= */
 
-void imprimir_composicao_bandejas(Pedido *pedido) {
-    printf("\n--- Composicao do Pedido #%d ---\n", pedido->id);
+void imprimir_composicao_bandejas(const Cozinha *c, Pedido *pedido) {
+    logf_loja(c->loja, "\n--- Composicao do Pedido #%d ---\n", pedido->id);
     TipoItem *itens_comer = (TipoItem *)malloc(sizeof(TipoItem) * (size_t)pedido->num_itens);
     TipoItem *itens_beber = (TipoItem *)malloc(sizeof(TipoItem) * (size_t)pedido->num_itens);
     if (!itens_comer || !itens_beber) {
-        perror("Falha ao alocar memoria para impressao de bandejas");
+        logf_loja(c->loja, "Falha ao alocar memoria para impressao de bandejas\n");
         free(itens_comer); free(itens_beber);
         return;
     }
@@ -207,13 +224,17 @@ void imprimir_composicao_bandejas(Pedido *pedido) {
     }
     int bandeja_num = 1, idxc = 0, idxb = 0;
     while (idxc < count_comer || idxb < count_beber) {
-        printf("Bandeja %d:\n", bandeja_num++);
-        for (int i = 0; i < 2 && idxc < count_comer; i++) printf("  - %s\n", NOMES_ITENS[itens_comer[idxc++]]);
-        for (int i = 0; i < 2 && idxb < count_beber; i++) printf("  - %s\n", NOMES_ITENS[itens_beber[idxb++]]);
+        logf_loja(c->loja, "Bandeja %d:\n", bandeja_num++);
+        for (int i = 0; i < 2 && idxc < count_comer; i++) logf_loja(c->loja, "  - %s\n", NOMES_ITENS[itens_comer[idxc++]]);
+        for (int i = 0; i < 2 && idxb < count_beber; i++) logf_loja(c->loja, "  - %s\n", NOMES_ITENS[itens_beber[idxb++]]);
     }
-    printf("---------------------------------\n");
+    logf_loja(c->loja, "---------------------------------\n");
     free(itens_comer); free(itens_beber);
 }
+
+/* =============================================================================
+   4. MOTOR POR LOJA (PASSO LOCAL) E DESPACHO
+   ============================================================================= */
 
 Pedido *encontrar_pedido_em_andamento(Cozinha *c, int pedido_id) {
     for (int i = 0; i < c->num_pedidos_em_andamento; i++) {
@@ -221,10 +242,6 @@ Pedido *encontrar_pedido_em_andamento(Cozinha *c, int pedido_id) {
     }
     return NULL;
 }
-
-/* =============================================================================
-   4. MOTOR (DESPACHO E LOOP DE EVENTOS)
-   ============================================================================= */
 
 void despachar_tarefas(Cozinha *c) {
     Habilidade habilidades[] = {HABILIDADE_SANDUICHE, HABILIDADE_BATATA, HABILIDADE_BEBIDAS, HABILIDADE_MONTAGEM};
@@ -259,16 +276,14 @@ void despachar_tarefas(Cozinha *c) {
 
             c->num_tarefas_em_execucao++;
             void *pp = c->tarefas_em_execucao;
-            int rc = safe_realloc_array(&pp, (size_t)c->num_tarefas_em_execucao, sizeof(Tarefa));
-            if (rc != 0) { perror("Falha alocar tarefas_em_execucao"); exit(1); }
+            if (safe_realloc_array(&pp, (size_t)c->num_tarefas_em_execucao, sizeof(Tarefa)) != 0) { logf_loja(c->loja, "Falha alocar tarefas_em_execucao\n"); exit(1); }
             c->tarefas_em_execucao = (Tarefa *)pp;
             c->tarefas_em_execucao[c->num_tarefas_em_execucao - 1] = *t;
 
             Pedido *p = encontrar_pedido_em_andamento(c, t->pedido_id);
             int tg = p ? p->tempo_chegada : -1;
-            printf("[Loja %d | Tempo: %ds | Tempo Global do Pedido: %ds] Func. #%d iniciou %s do Pedido #%d (conclui em %ds).\n",
-                   c->loja, c->tempo_atual, tg, c->funcionarios[idf].id, NOMES_ITENS[t->tipo_item],
-                   t->pedido_id, t->tempo_conclusao);
+            logf_loja(c->loja, "[Tempo: %ds | Tempo Global do Pedido: %ds] Func. #%d iniciou %s do Pedido #%d (conclui em %ds).\n",
+                      c->tempo_atual, tg, c->funcionarios[idf].id, NOMES_ITENS[t->tipo_item], t->pedido_id, t->tempo_conclusao);
 
             c->tarefas_na_fila_preparo[i] = c->tarefas_na_fila_preparo[c->num_tarefas_na_fila_preparo - 1];
             c->num_tarefas_na_fila_preparo--;
@@ -279,139 +294,149 @@ void despachar_tarefas(Cozinha *c) {
 
 static void iniciar_pedido(Cozinha *c, Pedido *p) {
     p->status = STATUS_EM_PREPARO;
+
     c->num_pedidos_em_andamento++;
     void *pp = c->pedidos_em_andamento;
-    int rc = safe_realloc_array(&pp, (size_t)c->num_pedidos_em_andamento, sizeof(Pedido *));
-    if (rc != 0) { perror("Falha alocar pedidos_em_andamento"); exit(1); }
+    if (safe_realloc_array(&pp, (size_t)c->num_pedidos_em_andamento, sizeof(Pedido *)) != 0) { logf_loja(c->loja, "Falha alocar pedidos_em_andamento\n"); exit(1); }
     c->pedidos_em_andamento = (Pedido **)pp;
     c->pedidos_em_andamento[c->num_pedidos_em_andamento - 1] = p;
 
-    printf("[Loja %d | Tempo: %ds | Tempo Global do Pedido: %ds] Iniciando preparo do Pedido #%d.\n",
-           c->loja, c->tempo_atual, p->tempo_chegada, p->id);
+    logf_loja(c->loja, "[Tempo: %ds | Tempo Global do Pedido: %ds] Iniciando preparo do Pedido #%d.\n",
+              c->tempo_atual, p->tempo_chegada, p->id);
 
     for (int i = 0; i < p->num_itens; i++) {
         Tarefa t = (Tarefa){p->id, p->itens[i], 0};
         c->num_tarefas_na_fila_preparo++;
         void *pp2 = c->tarefas_na_fila_preparo;
-        rc = safe_realloc_array(&pp2, (size_t)c->num_tarefas_na_fila_preparo, sizeof(Tarefa));
-        if (rc != 0) { perror("Falha alocar tarefas_na_fila_preparo"); exit(1); }
+        if (safe_realloc_array(&pp2, (size_t)c->num_tarefas_na_fila_preparo, sizeof(Tarefa)) != 0) { logf_loja(c->loja, "Falha alocar tarefas_na_fila_preparo\n"); exit(1); }
         c->tarefas_na_fila_preparo = (Tarefa *)pp2;
         c->tarefas_na_fila_preparo[c->num_tarefas_na_fila_preparo - 1] = t;
     }
     c->total_pedidos_criados++;
 }
 
-void executar_simulacao(Cozinha *c) {
-    printf("\n=== INICIANDO SIMULACAO (Loja %d) ===\n", c->loja);
+/* aplica um “passo” completo na loja no tempo alvo 't' (processa chegadas, despachos, conclusões <= t) */
+static void processar_ate_tempo(Cozinha *c, int t) {
+    c->tempo_atual = t;
+    int houve_acao;
+    do {
+        houve_acao = 0;
 
-    while (c->pedidos_na_fila_espera != NULL ||
-           c->num_tarefas_na_fila_preparo > 0 ||
-           c->num_tarefas_em_execucao > 0 ||
-           c->num_pedidos_em_andamento > 0) {
+        while (c->pedidos_na_fila_espera && c->pedidos_na_fila_espera->tempo_chegada <= c->tempo_atual) {
+            Pedido *p = c->pedidos_na_fila_espera;
+            c->pedidos_na_fila_espera = p->proximo;
+            p->proximo = NULL;
+            iniciar_pedido(c, p);
+            houve_acao = 1;
+        }
 
-        int houve_acao;
-        do {
-            houve_acao = 0;
+        int antes = c->num_tarefas_em_execucao;
+        despachar_tarefas(c);
+        if (c->num_tarefas_em_execucao > antes) houve_acao = 1;
 
-            // 1) Chegadas agendadas no tempo atual (Tempo Global)
-            while (c->pedidos_na_fila_espera && c->pedidos_na_fila_espera->tempo_chegada <= c->tempo_atual) {
-                Pedido *p = c->pedidos_na_fila_espera;
-                c->pedidos_na_fila_espera = p->proximo;
-                p->proximo = NULL;
-                iniciar_pedido(c, p);
+        for (int i = c->num_tarefas_em_execucao - 1; i >= 0; i--) {
+            Tarefa *tarefa = &c->tarefas_em_execucao[i];
+            if (tarefa->tempo_conclusao <= c->tempo_atual) {
                 houve_acao = 1;
-            }
-
-            // 2) Despacho de tarefas
-            int antes = c->num_tarefas_em_execucao;
-            despachar_tarefas(c);
-            if (c->num_tarefas_em_execucao > antes) houve_acao = 1;
-
-            // 3) Conclusões de tarefas no tempo atual
-            for (int i = c->num_tarefas_em_execucao - 1; i >= 0; i--) {
-                Tarefa *t = &c->tarefas_em_execucao[i];
-                if (t->tempo_conclusao <= c->tempo_atual) {
-                    houve_acao = 1;
-                    Pedido *p = encontrar_pedido_em_andamento(c, t->pedido_id);
-                    if (p) {
-                        printf("[Loja %d | Tempo: %ds | Tempo Global do Pedido: %ds] %s do Pedido #%d foi concluido.\n",
-                               c->loja, c->tempo_atual, p->tempo_chegada, NOMES_ITENS[t->tipo_item], p->id);
-                        if (t->tipo_item == ITEM_MONTAGEM) {
-                            int tempo_prod = c->tempo_atual - p->tempo_chegada;
-                            if (tempo_prod <= TEMPO_MAX_ATENDIMENTO) {
-                                c->atendidos_no_prazo++;
-                                p->status = STATUS_CONCLUIDO_NO_PRAZO;
-                                printf(">> [Loja %d] Pedido #%d FINALIZADO no prazo. Tempo (Global): %ds.\n",
-                                       c->loja, p->id, tempo_prod);
-                            } else {
-                                c->atendidos_com_atraso++;
-                                p->status = STATUS_CONCLUIDO_ATRASADO;
-                                printf(">> [Loja %d] Pedido #%d FINALIZADO com atraso. Tempo (Global): %ds.\n",
-                                       c->loja, p->id, tempo_prod);
-                            }
-                            imprimir_composicao_bandejas(p);
-
-                            // remove pedido de em_andamento e libera memória
-                            int idx = -1;
-                            for (int j = 0; j < c->num_pedidos_em_andamento; j++) {
-                                if (c->pedidos_em_andamento[j]->id == p->id) { idx = j; break; }
-                            }
-                            if (idx != -1) {
-                                free(p->itens);
-                                free(p);
-                                c->pedidos_em_andamento[idx] =
-                                    c->pedidos_em_andamento[c->num_pedidos_em_andamento - 1];
-                                c->num_pedidos_em_andamento--;
-                            }
+                Pedido *p = encontrar_pedido_em_andamento(c, tarefa->pedido_id);
+                if (p) {
+                    logf_loja(c->loja, "[Tempo: %ds | Tempo Global do Pedido: %ds] %s do Pedido #%d foi concluido.\n",
+                              c->tempo_atual, p->tempo_chegada, NOMES_ITENS[tarefa->tipo_item], p->id);
+                    if (tarefa->tipo_item == ITEM_MONTAGEM) {
+                        int tempo_prod = c->tempo_atual - p->tempo_chegada;
+                        if (tempo_prod <= TEMPO_MAX_ATENDIMENTO) {
+                            c->atendidos_no_prazo++; p->status = STATUS_CONCLUIDO_NO_PRAZO;
+                            logf_loja(c->loja, ">> Pedido #%d FINALIZADO no prazo. Tempo (Global): %ds.\n", p->id, tempo_prod);
                         } else {
-                            p->tarefas_preparo_restantes--;
-                            if (p->tarefas_preparo_restantes == 0 && p->status == STATUS_EM_PREPARO) {
-                                p->status = STATUS_AGUARDANDO_MONTAGEM;
-                                Tarefa tm = (Tarefa){p->id, ITEM_MONTAGEM, 0};
-                                c->num_tarefas_na_fila_preparo++;
-                                void *pp2 = c->tarefas_na_fila_preparo;
-                                int rc = safe_realloc_array(&pp2, (size_t)c->num_tarefas_na_fila_preparo, sizeof(Tarefa));
-                                if (rc != 0) { perror("Falha alocar tarefas_na_fila_preparo"); exit(1); }
-                                c->tarefas_na_fila_preparo = (Tarefa *)pp2;
-                                c->tarefas_na_fila_preparo[c->num_tarefas_na_fila_preparo - 1] = tm;
-                                printf("[Loja %d | Tempo: %ds | Tempo Global do Pedido: %ds] Pedido #%d pronto para montagem.\n",
-                                       c->loja, c->tempo_atual, p->tempo_chegada, p->id);
-                            }
+                            c->atendidos_com_atraso++; p->status = STATUS_CONCLUIDO_ATRASADO;
+                            logf_loja(c->loja, ">> Pedido #%d FINALIZADO com atraso. Tempo (Global): %ds.\n", p->id, tempo_prod);
+                        }
+                        imprimir_composicao_bandejas(c, p);
+                        int idx = -1;
+                        for (int j = 0; j < c->num_pedidos_em_andamento; j++) if (c->pedidos_em_andamento[j]->id == p->id) { idx = j; break; }
+                        if (idx != -1) {
+                            free(p->itens); free(p);
+                            c->pedidos_em_andamento[idx] =
+                                c->pedidos_em_andamento[c->num_pedidos_em_andamento - 1];
+                            c->num_pedidos_em_andamento--;
+                        }
+                    } else {
+                        p->tarefas_preparo_restantes--;
+                        if (p->tarefas_preparo_restantes == 0 && p->status == STATUS_EM_PREPARO) {
+                            p->status = STATUS_AGUARDANDO_MONTAGEM;
+                            Tarefa tm = (Tarefa){p->id, ITEM_MONTAGEM, 0};
+                            c->num_tarefas_na_fila_preparo++;
+                            void *pp3 = c->tarefas_na_fila_preparo;
+                            if (safe_realloc_array(&pp3, (size_t)c->num_tarefas_na_fila_preparo, sizeof(Tarefa)) != 0) { logf_loja(c->loja, "Falha alocar tarefas_na_fila_preparo\n"); exit(1); }
+                            c->tarefas_na_fila_preparo = (Tarefa *)pp3;
+                            c->tarefas_na_fila_preparo[c->num_tarefas_na_fila_preparo - 1] = tm;
+                            logf_loja(c->loja, "[Tempo: %ds | Tempo Global do Pedido: %ds] Pedido #%d pronto para montagem.\n",
+                                      c->tempo_atual, p->tempo_chegada, p->id);
                         }
                     }
-                    // remove tarefa concluída
-                    c->tarefas_em_execucao[i] = c->tarefas_em_execucao[c->num_tarefas_em_execucao - 1];
-                    c->num_tarefas_em_execucao--;
                 }
-            }
-        } while (houve_acao);
-
-        // Próximo evento: menor entre próxima conclusão e próxima chegada
-        int proximo_tempo_tarefa = INT_MAX;
-        for (int i = 0; i < c->num_tarefas_em_execucao; i++) {
-            if (c->tarefas_em_execucao[i].tempo_conclusao < proximo_tempo_tarefa) {
-                proximo_tempo_tarefa = c->tarefas_em_execucao[i].tempo_conclusao;
+                c->tarefas_em_execucao[i] = c->tarefas_em_execucao[c->num_tarefas_em_execucao - 1];
+                c->num_tarefas_em_execucao--;
             }
         }
-        int proximo_tempo_chegada = INT_MAX;
-        if (c->pedidos_na_fila_espera) proximo_tempo_chegada = c->pedidos_na_fila_espera->tempo_chegada;
+    } while (houve_acao);
+}
 
-        int proximo_evento = proximo_tempo_tarefa < proximo_tempo_chegada
-                             ? proximo_tempo_tarefa
-                             : proximo_tempo_chegada;
-
-        if (proximo_evento == INT_MAX) break;
-        if (proximo_evento > c->tempo_atual) c->tempo_atual = proximo_evento;
-        else c->tempo_atual++;
+/* próximo evento em uma loja (min entre próxima conclusão e próxima chegada) */
+static int proximo_evento_da_loja(Cozinha *c) {
+    int t_chegada = c->pedidos_na_fila_espera ? c->pedidos_na_fila_espera->tempo_chegada : INT_MAX;
+    int t_conc = INT_MAX;
+    for (int i = 0; i < c->num_tarefas_em_execucao; i++) {
+        if (c->tarefas_em_execucao[i].tempo_conclusao < t_conc)
+            t_conc = c->tarefas_em_execucao[i].tempo_conclusao;
     }
+    return (t_chegada < t_conc) ? t_chegada : t_conc;
+}
 
-    printf("\n=== LOJA %d: SIMULACAO FINALIZADA EM %d s ===\n", c->loja, c->tempo_atual);
-    printf("Total processados: %d\n", c->atendidos_no_prazo + c->atendidos_com_atraso);
-    printf("No prazo: %d | Atrasados: %d\n", c->atendidos_no_prazo, c->atendidos_com_atraso);
+/* verifica se há trabalho pendente em uma loja */
+static int loja_tem_trabalho(Cozinha *c) {
+    return c->pedidos_na_fila_espera != NULL ||
+           c->num_tarefas_na_fila_preparo > 0 ||
+           c->num_tarefas_em_execucao > 0 ||
+           c->num_pedidos_em_andamento > 0;
 }
 
 /* =============================================================================
-   5. LEITURA DE CSV (tempo_global,destino,q1..q7)
+   5. SIMULAÇÃO CONJUNTA (DUAS LOJAS EM PARALELO LÓGICO) COM RITMO 10:1
+   ============================================================================= */
+
+void executar_simulacao_conjunta_scaled(Cozinha *l1, Cozinha *l2) {
+    logf_loja(1, "INICIANDO SIMULACAO CONJUNTA (Loja 1)\n");
+    logf_loja(2, "INICIANDO SIMULACAO CONJUNTA (Loja 2)\n");
+
+    while (loja_tem_trabalho(l1) || loja_tem_trabalho(l2)) {
+        int n1 = proximo_evento_da_loja(l1);
+        int n2 = proximo_evento_da_loja(l2);
+        int proximo = (n1 < n2) ? n1 : n2;
+        if (proximo == INT_MAX) break;
+
+        int delta_sim_l1 = (proximo > l1->tempo_atual) ? (proximo - l1->tempo_atual) : 1;
+        int delta_sim_l2 = (proximo > l2->tempo_atual) ? (proximo - l2->tempo_atual) : 1;
+        int delta_sim = delta_sim_l1 < delta_sim_l2 ? delta_sim_l1 : delta_sim_l2;
+        if (delta_sim < 1) delta_sim = 1;
+
+        unsigned ms = (unsigned)((delta_sim * 1000) / SIM_TO_REAL_SCALE);
+        sleep_ms(ms);
+
+        processar_ate_tempo(l1, proximo);
+        processar_ate_tempo(l2, proximo);
+    }
+
+    logf_loja(1, "SIMULACAO FINALIZADA EM %d s\n", l1->tempo_atual);
+    logf_loja(1, "Total processados: %d | No prazo: %d | Atrasados: %d\n",
+              l1->atendidos_no_prazo + l1->atendidos_com_atraso, l1->atendidos_no_prazo, l1->atendidos_com_atraso);
+    logf_loja(2, "SIMULACAO FINALIZADA EM %d s\n", l2->tempo_atual);
+    logf_loja(2, "Total processados: %d | No prazo: %d | Atrasados: %d\n",
+              l2->atendidos_no_prazo + l2->atendidos_com_atraso, l2->atendidos_no_prazo, l2->atendidos_com_atraso);
+}
+
+/* =============================================================================
+   6. CSV (tempo_global,destino,q1..q7)
    ============================================================================= */
 
 static int parse_int(const char *s, int *out) {
@@ -458,7 +483,6 @@ static int carregar_pedidos_csv(const char *caminho, Cozinha *l1, Cozinha *l2, i
     char linha[1024];
     int lnum = 0, carregados = 0;
 
-    // Detecta header textual (1ª célula não numérica)
     long pos0 = ftell(f);
     if (fgets(linha, sizeof linha, f)) {
         lnum++;
@@ -506,7 +530,7 @@ static int carregar_pedidos_csv(const char *caminho, Cozinha *l1, Cozinha *l2, i
 }
 
 /* =============================================================================
-   6. MAIN
+   7. MAIN
    ============================================================================= */
 
 int main(int argc, char **argv) {
@@ -522,10 +546,10 @@ int main(int argc, char **argv) {
     int next_id = 1;
     int n = carregar_pedidos_csv(argv[1], &loja1, &loja2, &next_id);
     if (n < 0) return 1;
-    printf("[Sistema] %d pedidos carregados do CSV.\n", n);
+    logf_loja(1, "[Sistema] %d pedidos carregados do CSV.\n", n);
+    logf_loja(2, "[Sistema] %d pedidos carregados do CSV.\n", n);
 
-    executar_simulacao(&loja1);
-    executar_simulacao(&loja2);
+    executar_simulacao_conjunta_scaled(&loja1, &loja2);
 
     limpar_cozinha(&loja1);
     limpar_cozinha(&loja2);
