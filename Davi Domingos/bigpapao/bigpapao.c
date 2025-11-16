@@ -1,8 +1,9 @@
 /*
-  Simulação de cozinha (envio em tempo real)
-  - Ao finalizar o pedido no menu, ele é enviado IMEDIATAMENTE à linha de produção.
-  - Gera tarefas de preparo e chama o despachante no tempo atual para iniciar execução.
-  - Mantém boas práticas: validação de entrada, realloc seguro, comentários explicativos.
+  Simulação de cozinha (envio em tempo real + entrada até -1 + menu de itens)
+  - Menu explícito dos itens (1..7) mostrado a cada iteração.
+  - 0 finaliza o pedido atual e envia IMEDIATAMENTE à produção no tempo corrente.
+  - -1 encerra a coleta; se houver itens pendentes, o pedido é finalizado e enviado antes de sair.
+  - Boas práticas: validação de entrada, realloc seguro, comentários explicativos.
 
   Compilação sugerida:
     gcc -std=c11 -Wall -Wextra -Wpedantic -O2 bigpapao.c -o bigpapao
@@ -13,7 +14,7 @@
 #include <string.h>
 #include <limits.h>
 #include <stddef.h>
- 
+
 /* =============================================================================
    0. FUNÇÕES UTILITÁRIAS
    ============================================================================= */
@@ -209,9 +210,25 @@ void limpar_cozinha(Cozinha *c) {
 }
 
 /* =============================================================================
-   3. MENU INTERATIVO E IMPRESSÃO DE BANDEJAS
+   3. MENU INTERATIVO, IMPRESSÃO DE BANDEJAS E ENVIO IMEDIATO
    ============================================================================= */
 
+// Mostra o cardápio de forma clara, com instruções de controle.
+static void imprimir_menu_itens(void) {
+    printf("\n===== CARDAPIO BIGPAPAO =====\n");
+    printf("  1. %s\n", NOMES_ITENS[ITEM_SANDUICHE_SIMPLES]);
+    printf("  2. %s\n", NOMES_ITENS[ITEM_SANDUICHE_MEDIO]);
+    printf("  3. %s\n", NOMES_ITENS[ITEM_SANDUICHE_ELABORADO]);
+    printf("  4. %s\n", NOMES_ITENS[ITEM_BATATA_FRITA]);
+    printf("  5. %s\n", NOMES_ITENS[ITEM_REFRIGERANTE]);
+    printf("  6. %s\n", NOMES_ITENS[ITEM_SUCO]);
+    printf("  7. %s\n", NOMES_ITENS[ITEM_MILK_SHAKE]);
+    printf("  0. Finalizar pedido atual e enviar à produção\n");
+    printf(" -1. Encerrar registro de pedidos\n");
+    printf("==============================\n");
+}
+
+// Imprime a composição das bandejas, separando comer/beber (regra 2+2).
 void imprimir_composicao_bandejas(Pedido *pedido) {
     printf("\n--- Composicao do Pedido #%d ---\n", pedido->id);
 
@@ -252,13 +269,9 @@ void imprimir_composicao_bandejas(Pedido *pedido) {
     free(itens_beber);
 }
 
-/* =============================================================================
-   3.1 ENVIO EM TEMPO REAL: iniciar_pedido_imediato
-   ============================================================================= */
+static void despachar_tarefas(Cozinha *c); // forward declaration
 
 // Converte um pedido recém-criado em tarefas e inicia produção imediatamente.
-static void despachar_tarefas(struct Cozinha *c); // forward declaration
-
 static void iniciar_pedido_imediato(Cozinha *c, Pedido *p) {
     // 1) Chegada agora e início de preparo
     p->tempo_chegada = c->tempo_atual;
@@ -297,38 +310,70 @@ static void iniciar_pedido_imediato(Cozinha *c, Pedido *p) {
     despachar_tarefas(c);
 }
 
-// Função interativa que guia o usuário na criação dos pedidos iniciais (envio imediato)
-void coletar_pedidos_do_usuario(Cozinha *c) {
-    int num_pedidos_iniciais;
-    printf("Bem-vindo ao sistema de simulacao do BigPapao!\n");
-    printf("Quantos pedidos iniciais deseja registrar? ");
-    while (scanf("%d", &num_pedidos_iniciais) != 1) {
-        printf("Entrada invalida. Por favor, digite um numero: ");
-        limpar_buffer_entrada();
-    }
-    limpar_buffer_entrada();
+/* =============================================================================
+   3.2 COLETA DE PEDIDOS ATÉ -1 (COM MENU)
+   ============================================================================= */
 
-    for (int i = 0; i < num_pedidos_iniciais; i++) {
-        int id_pedido_atual = i + 1;
+// Registra pedidos continuamente; 0 finaliza pedido atual; -1 encerra toda a coleta.
+// Pedidos finalizados são enviados imediatamente para produção.
+void coletar_pedidos_do_usuario(Cozinha *c) {
+    printf("Bem-vindo ao sistema de simulacao do BigPapao!\n");
+    printf("Adicione itens (1-7), 0=Finalizar pedido, -1=Encerrar coleta.\n");
+
+    int id_pedido_atual = 1;
+
+    for (;;) {
         printf("\n--- Registrando Pedido #%d ---\n", id_pedido_atual);
 
         TipoItem *itens_do_pedido = NULL;
         int qtd_itens = 0;
-        int escolha = -1;
+        int escolha = -2;
 
-        do {
-            printf("Escolha os itens para o pedido #%d:\n", id_pedido_atual);
-            for (int j = 0; j < 7; j++)
-                printf("  %d. %s\n", j + 1, NOMES_ITENS[j]);
-            printf("  0. Finalizar Pedido\n");
-            printf("Digite o numero do item: ");
+        for (;;) {
+            // Exibe o cardápio completo antes de cada escolha.
+            imprimir_menu_itens();
 
+            printf("Sua escolha: ");
+            // Validação robusta
             while (scanf("%d", &escolha) != 1) {
-                printf("Entrada invalida. Por favor, digite um numero (0-7): ");
+                printf("Entrada invalida. Digite (-1, 0 ou 1-7): ");
                 limpar_buffer_entrada();
             }
             limpar_buffer_entrada();
 
+            // Encerrar toda a coleta
+            if (escolha == -1) {
+                if (qtd_itens > 0) {
+                    // Finaliza e envia o pedido parcial
+                    Pedido *novo_pedido = (Pedido *)malloc(sizeof(Pedido));
+                    if (novo_pedido == NULL) {
+                        perror("Falha critica de alocacao (malloc pedido)");
+                        free(itens_do_pedido);
+                        exit(1);
+                    }
+                    novo_pedido->id = id_pedido_atual;
+                    novo_pedido->status = STATUS_NA_FILA;
+                    novo_pedido->itens = itens_do_pedido;
+                    novo_pedido->num_itens = qtd_itens;
+                    novo_pedido->tarefas_preparo_restantes = qtd_itens;
+                    novo_pedido->proximo = NULL;
+
+                    iniciar_pedido_imediato(c, novo_pedido);
+                    c->total_pedidos_criados++;
+                    printf(">> Pedido #%d finalizado com %d itens e ENVIADO à produção.\n",
+                           id_pedido_atual, qtd_itens);
+                } else {
+                    printf(">> Registro encerrado.\n");
+                }
+                return; // sai de toda a coleta
+            }
+
+            // Finalizar o pedido atual
+            if (escolha == 0) {
+                break; // sai para finalizar/descartar conforme qtd_itens
+            }
+
+            // Adicionar item ao pedido atual
             if (escolha >= 1 && escolha <= 7) {
                 int quantidade;
                 printf("Digite a quantidade do item: ");
@@ -342,16 +387,15 @@ void coletar_pedidos_do_usuario(Cozinha *c) {
                     printf("Quantidade invalida, adicionando 1 unidade.\n");
                     quantidade = 1;
                 }
+
+                // Acrescenta 'quantidade' unidades do item escolhido
                 for (int k = 0; k < quantidade; k++) {
                     int novo_qtd = qtd_itens + 1;
                     void *pp = itens_do_pedido;
                     int rc = safe_realloc_array(&pp, (size_t)novo_qtd, sizeof(TipoItem));
                     if (rc != 0) {
-                        if (rc == -1) {
-                            fprintf(stderr, "Overflow ao alocar itens do pedido\n");
-                        } else {
-                            perror("Falha critica de alocacao (realloc itens)");
-                        }
+                        if (rc == -1) fprintf(stderr, "Overflow ao alocar itens do pedido\n");
+                        else perror("Falha critica de alocacao (realloc itens)");
                         free(itens_do_pedido);
                         exit(1);
                     }
@@ -359,12 +403,14 @@ void coletar_pedidos_do_usuario(Cozinha *c) {
                     itens_do_pedido[novo_qtd - 1] = (TipoItem)(escolha - 1);
                     qtd_itens = novo_qtd;
                 }
-                printf(">> (%d) - '%s' adicionado(s) ao pedido.\n\n", quantidade, NOMES_ITENS[escolha - 1]);
-            } else if (escolha != 0) {
-                printf("Opcao invalida! Tente novamente.\n\n");
-            }
-        } while (escolha != 0);
 
+                printf(">> (%d) - '%s' adicionado(s) ao pedido.\n\n", quantidade, NOMES_ITENS[escolha - 1]);
+            } else {
+                printf("Opcao invalida! Tente novamente.\n");
+            }
+        }
+
+        // Finaliza pedido normal (0 digitado)
         if (qtd_itens > 0) {
             Pedido *novo_pedido = (Pedido *)malloc(sizeof(Pedido));
             if (novo_pedido == NULL) {
@@ -380,15 +426,18 @@ void coletar_pedidos_do_usuario(Cozinha *c) {
             novo_pedido->tarefas_preparo_restantes = qtd_itens;
             novo_pedido->proximo = NULL;
 
-            // ENVIO IMEDIATO: vai direto para produção agora
+            // Envio imediato à produção no tempo atual
             iniciar_pedido_imediato(c, novo_pedido);
 
             c->total_pedidos_criados++;
-            printf(">> Pedido #%d finalizado com %d itens e ENVIADO à produção.\n",
+            printf(">> Pedido #%d finalizado com %d itens e ENVIADO a producao.\n",
                    id_pedido_atual, qtd_itens);
         } else {
             printf(">> Pedido #%d cancelado por nao ter itens.\n", id_pedido_atual);
         }
+
+        // Próximo pedido
+        id_pedido_atual++;
     }
 }
 
