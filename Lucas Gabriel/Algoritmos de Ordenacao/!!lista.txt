@@ -1,0 +1,13 @@
+Algoritmos de Ordenação
+
+* Bubble Sort
+
+- Select Sort
+- Insert Sort
+
+
+- Merge Sort
+- Comb Sort
+- Radix Sort
+- Quick sort
+- Bin sort
