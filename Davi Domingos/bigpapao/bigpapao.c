@@ -1,13 +1,8 @@
 /*
-  Simulação de cozinha (versão corrigida)
-  Correções principais:
-  - Removida a chamada a system("cls||clear") por motivos de portabilidade e segurança (CERT: evitar system) [CORREÇÃO].
-  - Chegadas espaçadas no tempo: cada pedido recebe tempo_chegada incremental (modelo de next-event) [CORREÇÃO].
-  - Despacho: cada funcionário recebe no máximo 1 tarefa por rodada (evita multitarefa simultânea não modelada) [CORREÇÃO].
-  - realloc seguro: checagem de overflow em (count * elem_size) e uso de ponteiro temporário encapsulado [CORREÇÃO].
-  - Impressão do ID real do funcionário (struct.id) em vez de índice+1 [CORREÇÃO].
-  - Classificação comer/beber por função explícita em vez de depender da ordem do enum [CORREÇÃO].
-  - Includes enxutos e comentários focados em regras/decisões.
+  Simulação de cozinha (envio em tempo real)
+  - Ao finalizar o pedido no menu, ele é enviado IMEDIATAMENTE à linha de produção.
+  - Gera tarefas de preparo e chama o despachante no tempo atual para iniciar execução.
+  - Mantém boas práticas: validação de entrada, realloc seguro, comentários explicativos.
 
   Compilação sugerida:
     gcc -std=c11 -Wall -Wextra -Wpedantic -O2 bigpapao.c -o bigpapao
@@ -18,10 +13,10 @@
 #include <string.h>
 #include <limits.h>
 #include <stddef.h>
-
-// =============================================================================
-// 0. FUNÇÕES UTILITÁRIAS (CORREÇÃO)
-// =============================================================================
+ 
+/* =============================================================================
+   0. FUNÇÕES UTILITÁRIAS
+   ============================================================================= */
 
 // Limpa stdin até '\n' ou EOF para estabilizar leituras subsequentes de scanf.
 void limpar_buffer_entrada(void) {
@@ -43,14 +38,15 @@ static int safe_realloc_array(void **pp, size_t count, size_t elem_size) {
     return 0;
 }
 
-// =============================================================================
-// 1. DEFINIÇÕES E ESTRUTURAS DE DADOS
-// =============================================================================
+/* =============================================================================
+   1. DEFINIÇÕES E ESTRUTURAS DE DADOS
+   ============================================================================= */
 
 #define NUM_FUNCIONARIOS 13
 #define TEMPO_MAX_ATENDIMENTO 300
 #define TEMPO_ATENDIMENTO_CAIXA 10
 
+// Tipos de item do cardápio e tarefa de montagem
 typedef enum {
     ITEM_SANDUICHE_SIMPLES,
     ITEM_SANDUICHE_MEDIO,
@@ -67,6 +63,7 @@ const char *NOMES_ITENS[] = {
     "Batata Frita", "Refrigerante", "Suco", "Milk Shake", "Montagem de Bandeja"
 };
 
+// Estados do pedido
 typedef enum {
     STATUS_NA_FILA,
     STATUS_EM_PREPARO,
@@ -76,6 +73,7 @@ typedef enum {
     STATUS_CONCLUIDO_ATRASADO
 } StatusPedido;
 
+// Habilidades (bitmask)
 typedef enum {
     HABILIDADE_SANDUICHE = 1 << 0,
     HABILIDADE_BATATA    = 1 << 1,
@@ -83,35 +81,41 @@ typedef enum {
     HABILIDADE_MONTAGEM  = 1 << 3
 } Habilidade;
 
+// Tempos de preparo por tipo de item
 const int TEMPOS_DE_PREPARO[] = {58, 88, 105, 190, 5, 38, 60, 30};
 
+// Unidade de trabalho (tarefa)
 typedef struct Tarefa {
     int pedido_id;
     TipoItem tipo_item;
     int tempo_conclusao;
 } Tarefa;
 
+// Pedido do cliente
 typedef struct Pedido {
     int id;
-    int tempo_chegada;
+    int tempo_chegada;               // quando entrou na produção
     StatusPedido status;
-    int tarefas_preparo_restantes;
+    int tarefas_preparo_restantes;   // decrementa até 0; então cria montagem
     TipoItem *itens;
     int num_itens;
-    struct Pedido *proximo;
+    struct Pedido *proximo;          // para fila (se usada)
 } Pedido;
 
+// Funcionário
 typedef struct {
     int id;
-    unsigned int habilidades;
-    int livre_a_partir_de;
+    unsigned int habilidades; // bitmask
+    int livre_a_partir_de;    // agenda (tempo quando fica livre)
 } Funcionario;
 
+// Equipamentos (metadados)
 typedef struct Equipamento {
-    int capacidade_por_funcionario; // permanece como metadado (não usado para paralelizar trabalhador)
+    int capacidade_por_funcionario; // metadado; não paraleliza trabalhador
     int validade_produto_min;
 } Equipamento;
 
+// Estado global da simulação
 typedef struct Cozinha {
     int tempo_atual;
 
@@ -122,7 +126,7 @@ typedef struct Cozinha {
     Equipamento liquidificador;
 
     // Filas/Listas
-    Pedido *pedidos_na_fila_espera;
+    Pedido *pedidos_na_fila_espera;      // não usado no envio em tempo real, mas mantido
     Pedido **pedidos_em_andamento;
     int num_pedidos_em_andamento;
     Tarefa *tarefas_na_fila_preparo;
@@ -134,19 +138,16 @@ typedef struct Cozinha {
     int total_pedidos_criados;
     int atendidos_no_prazo;
     int atendidos_com_atraso;
-
-    // CORREÇÃO: agenda incremental de chegadas (modelo de caixa)
-    int proximo_tempo_chegada;
 } Cozinha;
 
-// Helper explícito para classificar bebidas (evita depender da ordem do enum)
+// Helper explícito para classificar bebidas (robusto a alterações no enum)
 static int item_e_bebida(TipoItem t) {
     return (t == ITEM_REFRIGERANTE || t == ITEM_SUCO || t == ITEM_MILK_SHAKE);
 }
 
-// =============================================================================
-// 2. FUNÇÕES DE GERENCIAMENTO DA COZINHA
-// =============================================================================
+/* =============================================================================
+   2. GERENCIAMENTO DA COZINHA
+   ============================================================================= */
 
 void inicializar_cozinha(Cozinha *cozinha) {
     memset(cozinha, 0, sizeof(Cozinha));
@@ -161,7 +162,7 @@ void inicializar_cozinha(Cozinha *cozinha) {
            cozinha->chapa.capacidade_por_funcionario,
            cozinha->fritadeira.capacidade_por_funcionario,
            cozinha->liquidificador.capacidade_por_funcionario);
-    printf("Tempo de atendimento no caixa (delay inicial): %d segundos.\n\n", TEMPO_ATENDIMENTO_CAIXA);
+    printf("Tempo de atendimento no caixa (informativo): %d segundos.\n\n", TEMPO_ATENDIMENTO_CAIXA);
 
     cozinha->funcionarios[0]  = (Funcionario){1,  HABILIDADE_SANDUICHE | HABILIDADE_BATATA, 0};
     cozinha->funcionarios[1]  = (Funcionario){2,  HABILIDADE_SANDUICHE | HABILIDADE_BATATA, 0};
@@ -176,11 +177,9 @@ void inicializar_cozinha(Cozinha *cozinha) {
     cozinha->funcionarios[10] = (Funcionario){11, HABILIDADE_SANDUICHE, 0};
     cozinha->funcionarios[11] = (Funcionario){12, HABILIDADE_BEBIDAS, 0};
     cozinha->funcionarios[12] = (Funcionario){13, 0, 0};
-
-    // CORREÇÃO: agenda incremental de chegadas
-    cozinha->proximo_tempo_chegada = TEMPO_ATENDIMENTO_CAIXA;
 }
 
+// Enfileira no fim de uma lista ligada simples (mantido para compatibilidade)
 void adicionar_pedido_na_fila_espera(Cozinha *c, Pedido *novo_pedido) {
     novo_pedido->proximo = NULL;
     if (c->pedidos_na_fila_espera == NULL) {
@@ -209,9 +208,9 @@ void limpar_cozinha(Cozinha *c) {
     }
 }
 
-// =============================================================================
-// 3. MENU INTERATIVO E IMPRESSÃO DE BANDEJAS
-// =============================================================================
+/* =============================================================================
+   3. MENU INTERATIVO E IMPRESSÃO DE BANDEJAS
+   ============================================================================= */
 
 void imprimir_composicao_bandejas(Pedido *pedido) {
     printf("\n--- Composicao do Pedido #%d ---\n", pedido->id);
@@ -253,6 +252,52 @@ void imprimir_composicao_bandejas(Pedido *pedido) {
     free(itens_beber);
 }
 
+/* =============================================================================
+   3.1 ENVIO EM TEMPO REAL: iniciar_pedido_imediato
+   ============================================================================= */
+
+// Converte um pedido recém-criado em tarefas e inicia produção imediatamente.
+static void despachar_tarefas(struct Cozinha *c); // forward declaration
+
+static void iniciar_pedido_imediato(Cozinha *c, Pedido *p) {
+    // 1) Chegada agora e início de preparo
+    p->tempo_chegada = c->tempo_atual;
+    p->status = STATUS_EM_PREPARO;
+
+    // 2) Adiciona a "em andamento"
+    c->num_pedidos_em_andamento++;
+    void *pp = c->pedidos_em_andamento;
+    int rc = safe_realloc_array(&pp, (size_t)c->num_pedidos_em_andamento, sizeof(Pedido *));
+    if (rc != 0) {
+        if (rc == -1) fprintf(stderr, "Overflow ao alocar pedidos_em_andamento\n");
+        else perror("Falha critica de alocacao (pedidos_em_andamento)");
+        exit(1);
+    }
+    c->pedidos_em_andamento = (Pedido **)pp;
+    c->pedidos_em_andamento[c->num_pedidos_em_andamento - 1] = p;
+
+    printf("[Tempo: %ds] Iniciando preparo do Pedido #%d.\n", c->tempo_atual, p->id);
+
+    // 3) Gera tarefas de preparo
+    for (int i = 0; i < p->num_itens; i++) {
+        Tarefa t = (Tarefa){p->id, p->itens[i], 0};
+        c->num_tarefas_na_fila_preparo++;
+        void *pp2 = c->tarefas_na_fila_preparo;
+        rc = safe_realloc_array(&pp2, (size_t)c->num_tarefas_na_fila_preparo, sizeof(Tarefa));
+        if (rc != 0) {
+            if (rc == -1) fprintf(stderr, "Overflow ao alocar tarefas_na_fila_preparo\n");
+            else perror("Falha critica de alocacao (tarefas_na_fila_preparo)");
+            exit(1);
+        }
+        c->tarefas_na_fila_preparo = (Tarefa *)pp2;
+        c->tarefas_na_fila_preparo[c->num_tarefas_na_fila_preparo - 1] = t;
+    }
+
+    // 4) Tenta iniciar agora com funcionários livres
+    despachar_tarefas(c);
+}
+
+// Função interativa que guia o usuário na criação dos pedidos iniciais (envio imediato)
 void coletar_pedidos_do_usuario(Cozinha *c) {
     int num_pedidos_iniciais;
     printf("Bem-vindo ao sistema de simulacao do BigPapao!\n");
@@ -329,29 +374,27 @@ void coletar_pedidos_do_usuario(Cozinha *c) {
             }
 
             novo_pedido->id = id_pedido_atual;
-
-            // CORREÇÃO: cada pedido recebe um tempo de chegada incremental no "caixa"
-            novo_pedido->tempo_chegada = c->proximo_tempo_chegada;
-            c->proximo_tempo_chegada += TEMPO_ATENDIMENTO_CAIXA;
-
             novo_pedido->status = STATUS_NA_FILA;
             novo_pedido->itens = itens_do_pedido;
             novo_pedido->num_itens = qtd_itens;
             novo_pedido->tarefas_preparo_restantes = qtd_itens;
+            novo_pedido->proximo = NULL;
 
-            adicionar_pedido_na_fila_espera(c, novo_pedido);
+            // ENVIO IMEDIATO: vai direto para produção agora
+            iniciar_pedido_imediato(c, novo_pedido);
+
             c->total_pedidos_criados++;
-            printf(">> Pedido #%d finalizado com %d itens. Chega em %ds.\n",
-                   id_pedido_atual, qtd_itens, novo_pedido->tempo_chegada);
+            printf(">> Pedido #%d finalizado com %d itens e ENVIADO à produção.\n",
+                   id_pedido_atual, qtd_itens);
         } else {
             printf(">> Pedido #%d cancelado por nao ter itens.\n", id_pedido_atual);
         }
     }
 }
 
-// =============================================================================
-// 4. O MOTOR DA SIMULAÇÃO
-// =============================================================================
+/* =============================================================================
+   4. MOTOR DA SIMULAÇÃO
+   ============================================================================= */
 
 Pedido *encontrar_pedido_em_andamento(Cozinha *c, int pedido_id) {
     for (int i = 0; i < c->num_pedidos_em_andamento; i++) {
@@ -361,6 +404,7 @@ Pedido *encontrar_pedido_em_andamento(Cozinha *c, int pedido_id) {
     return NULL;
 }
 
+// O "Gerente de Chão": aloca tarefas pendentes para funcionários livres.
 void despachar_tarefas(Cozinha *c) {
     Habilidade habilidades[] = {HABILIDADE_SANDUICHE, HABILIDADE_BATATA, HABILIDADE_BEBIDAS, HABILIDADE_MONTAGEM};
 
@@ -375,7 +419,7 @@ void despachar_tarefas(Cozinha *c) {
         }
         if (num_funcs_livres == 0) continue;
 
-        // CORREÇÃO: cada funcionário inicia no máximo 1 tarefa por rodada
+        // Regra: cada funcionário pode iniciar no máximo 1 tarefa nesta rodada.
         int capacidade_total = num_funcs_livres;
         int tarefas_alocadas_nesta_rodada = 0;
 
@@ -418,12 +462,12 @@ void despachar_tarefas(Cozinha *c) {
 
             printf("[Tempo: %ds] Func. #%d iniciou %s do Pedido #%d (conclui em %ds).\n",
                    c->tempo_atual,
-                   c->funcionarios[id_func_alocado].id, // CORREÇÃO: usa ID real
+                   c->funcionarios[id_func_alocado].id, // usa ID real do funcionário
                    NOMES_ITENS[tarefa_atual->tipo_item],
                    tarefa_atual->pedido_id,
                    tarefa_atual->tempo_conclusao);
 
-            // swap-and-pop
+            // Remove da fila de preparo (swap-and-pop)
             c->tarefas_na_fila_preparo[i] = c->tarefas_na_fila_preparo[c->num_tarefas_na_fila_preparo - 1];
             c->num_tarefas_na_fila_preparo--;
             tarefas_alocadas_nesta_rodada++;
@@ -439,54 +483,20 @@ void executar_simulacao(Cozinha *cozinha) {
         do {
             alguma_acao_ocorreu = 0;
 
-            // Chegada de pedidos quando atingir tempo_chegada
-            while (cozinha->pedidos_na_fila_espera != NULL &&
-                   cozinha->pedidos_na_fila_espera->tempo_chegada <= cozinha->tempo_atual) {
-                alguma_acao_ocorreu = 1;
-                Pedido *pedido_iniciado = cozinha->pedidos_na_fila_espera;
-                cozinha->pedidos_na_fila_espera = cozinha->pedidos_na_fila_espera->proximo;
-
-                pedido_iniciado->status = STATUS_EM_PREPARO;
-                cozinha->num_pedidos_em_andamento++;
-                void *pp = cozinha->pedidos_em_andamento;
-                int rc = safe_realloc_array(&pp, (size_t)cozinha->num_pedidos_em_andamento, sizeof(Pedido *));
-                if (rc != 0) {
-                    if (rc == -1) fprintf(stderr, "Overflow ao alocar pedidos_em_andamento\n");
-                    else perror("Falha critica de alocacao (pedidos_em_andamento)");
-                    exit(1);
-                }
-                cozinha->pedidos_em_andamento = (Pedido **)pp;
-                cozinha->pedidos_em_andamento[cozinha->num_pedidos_em_andamento - 1] = pedido_iniciado;
-
-                printf("[Tempo: %ds] Iniciando preparo do Pedido #%d.\n", cozinha->tempo_atual, pedido_iniciado->id);
-                for (int i = 0; i < pedido_iniciado->num_itens; i++) {
-                    Tarefa t = (Tarefa){pedido_iniciado->id, pedido_iniciado->itens[i], 0};
-                    cozinha->num_tarefas_na_fila_preparo++;
-                    void *pp2 = cozinha->tarefas_na_fila_preparo;
-                    rc = safe_realloc_array(&pp2, (size_t)cozinha->num_tarefas_na_fila_preparo, sizeof(Tarefa));
-                    if (rc != 0) {
-                        if (rc == -1) fprintf(stderr, "Overflow ao alocar tarefas_na_fila_preparo\n");
-                        else perror("Falha critica de alocacao (tarefas_na_fila_preparo)");
-                        exit(1);
-                    }
-                    cozinha->tarefas_na_fila_preparo = (Tarefa *)pp2;
-                    cozinha->tarefas_na_fila_preparo[cozinha->num_tarefas_na_fila_preparo - 1] = t;
-                }
-            }
-
+            // Tenta despachar tarefas pendentes neste tempo
             int num_tarefas_antes = cozinha->num_tarefas_em_execucao;
             despachar_tarefas(cozinha);
             if (cozinha->num_tarefas_em_execucao > num_tarefas_antes) {
                 alguma_acao_ocorreu = 1;
             }
 
+            // Processa tarefas que terminaram
             for (int i = cozinha->num_tarefas_em_execucao - 1; i >= 0; i--) {
                 Tarefa *tarefa_concluida = &cozinha->tarefas_em_execucao[i];
                 if (tarefa_concluida->tempo_conclusao <= cozinha->tempo_atual) {
                     alguma_acao_ocorreu = 1;
                     Pedido *pedido_pai = encontrar_pedido_em_andamento(cozinha, tarefa_concluida->pedido_id);
                     if (!pedido_pai) {
-                        // já removido ao finalizar montagem
                         cozinha->tarefas_em_execucao[i] = cozinha->tarefas_em_execucao[cozinha->num_tarefas_em_execucao - 1];
                         cozinha->num_tarefas_em_execucao--;
                         continue;
@@ -508,7 +518,7 @@ void executar_simulacao(Cozinha *cozinha) {
                         }
                         imprimir_composicao_bandejas(pedido_pai);
 
-                        // remove de em_andamento e libera memória
+                        // Remove de em_andamento e libera memória
                         int indice_pedido_removido = -1;
                         for (int j = 0; j < cozinha->num_pedidos_em_andamento; j++) {
                             if (cozinha->pedidos_em_andamento[j]->id == pedido_pai->id) {
@@ -543,13 +553,14 @@ void executar_simulacao(Cozinha *cozinha) {
                         }
                     }
 
-                    // remove tarefa concluída (swap-and-pop)
+                    // Remove tarefa concluída (swap-and-pop)
                     cozinha->tarefas_em_execucao[i] = cozinha->tarefas_em_execucao[cozinha->num_tarefas_em_execucao - 1];
                     cozinha->num_tarefas_em_execucao--;
                 }
             }
         } while (alguma_acao_ocorreu);
 
+        // Avanço de tempo: próximo término de tarefa
         int proximo_tempo_tarefa = INT_MAX;
         if (cozinha->num_tarefas_em_execucao > 0) {
             for (int i = 0; i < cozinha->num_tarefas_em_execucao; i++) {
@@ -559,16 +570,7 @@ void executar_simulacao(Cozinha *cozinha) {
             }
         }
 
-        int proximo_tempo_chegada = INT_MAX;
-        if (cozinha->pedidos_na_fila_espera != NULL) {
-            proximo_tempo_chegada = cozinha->pedidos_na_fila_espera->tempo_chegada; // cabeça é o próximo agendado
-        }
-
-        int proximo_evento = (proximo_tempo_tarefa < proximo_tempo_chegada)
-                               ? proximo_tempo_tarefa
-                               : proximo_tempo_chegada;
-
-        if (proximo_evento == INT_MAX) {
+        if (proximo_tempo_tarefa == INT_MAX) {
             if (cozinha->total_pedidos_criados > (cozinha->atendidos_no_prazo + cozinha->atendidos_com_atraso)) {
                 if (cozinha->num_tarefas_na_fila_preparo > 0) {
                     printf("AVISO: Simulacao parada. Existem %d tarefas na fila, mas nenhum funcionario disponivel/habilitado para executa-las (gargalo).\n",
@@ -580,10 +582,10 @@ void executar_simulacao(Cozinha *cozinha) {
             break;
         }
 
-        if (proximo_evento > cozinha->tempo_atual) {
-            cozinha->tempo_atual = proximo_evento;
+        if (proximo_tempo_tarefa > cozinha->tempo_atual) {
+            cozinha->tempo_atual = proximo_tempo_tarefa;
         } else {
-            cozinha->tempo_atual++;
+            cozinha->tempo_atual++; // segurança
         }
     }
 
@@ -593,13 +595,11 @@ void executar_simulacao(Cozinha *cozinha) {
     printf("Atendidos com Atraso (Prejuizo): %d\n", cozinha->atendidos_com_atraso);
 }
 
-// =============================================================================
-// 5. FUNÇÃO PRINCIPAL
-// =============================================================================
+/* =============================================================================
+   5. FUNÇÃO PRINCIPAL
+   ============================================================================= */
 
 int main(void) {
-    // CORREÇÃO: remover system("cls||clear") por portabilidade/segurança.
-
     Cozinha cozinha;
     inicializar_cozinha(&cozinha);
     coletar_pedidos_do_usuario(&cozinha);
