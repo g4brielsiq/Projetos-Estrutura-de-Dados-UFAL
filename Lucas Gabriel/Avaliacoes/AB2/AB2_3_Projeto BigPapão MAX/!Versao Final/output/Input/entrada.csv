@@ -1,0 +1,5 @@
+ID_Pedido,Qtd_Batata,Qtd_Simples,Qtd_Medio,Qtd_Elaborado,Qtd_Refri,Qtd_Suco,Qtd_Milkshake,Dist_Loja_1,Dist_Loja_2
+1,2,6,5,2,4,0,1,0,5
+2,0,0,0,0,1,0,0,5,0
+0,0,0,0,0,0,0,0,0,0
+3,5,4,5,9,2,1,1,11,9
