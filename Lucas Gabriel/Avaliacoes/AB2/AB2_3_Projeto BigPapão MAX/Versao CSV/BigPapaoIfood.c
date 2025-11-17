@@ -4,24 +4,35 @@
 #include <ctype.h>
 #include <limits.h>
 
+// Bibliotecas para criação de pastas
+#ifdef _WIN32
+#include <direct.h> // Para _mkdir no Windows
+#else
+#include <sys/stat.h> // Para mkdir no Linux/macOS
+#include <sys/types.h>
+#endif
+
 // =============================================================================
 // 1. DEFINIÇÕES E ESTRUTURAS DE DADOS
-// (A única mudança aqui é o 'loja_id' na struct Cozinha)
 // =============================================================================
 
 #define NUM_FUNCIONARIOS 13
 #define TEMPO_MAX_ATENDIMENTO 300
-// O TEMPO_ATENDIMENTO_CAIXA foi removido, pois agora simulamos o tempo ocioso com a entrada "0".
+
+#define PASTA_INPUT "Input"
+#define ARQUIVO_INPUT "Input/entrada.csv" 
+#define PASTA_OUTPUT "Output"
+#define ARQUIVO_OUTPUT "Output/resultado.txt"
 
 typedef enum {
-    ITEM_SANDUICHE_SIMPLES, ITEM_SANDUICHE_MEDIO, ITEM_SANDUICHE_ELABORADO,
-    ITEM_BATATA_FRITA, ITEM_REFRIGERANTE, ITEM_SUCO, ITEM_MILK_SHAKE,
+    ITEM_BATATA_FRITA, ITEM_SANDUICHE_SIMPLES, ITEM_SANDUICHE_MEDIO, ITEM_SANDUICHE_ELABORADO,
+    ITEM_REFRIGERANTE, ITEM_SUCO, ITEM_MILK_SHAKE,
     ITEM_MONTAGEM
 } TipoItem;
 
 const char *NOMES_ITENS[] = {
-    "Sanduiche Simples", "Sanduiche Medio", "Sanduiche Elaborado",
-    "Batata Frita", "Refrigerante", "Suco", "Milk Shake", "Montagem de Bandeja"
+    "Batata Frita", "Sanduiche Simples", "Sanduiche Medio", "Sanduiche Elaborado",
+    "Refrigerante", "Suco", "Milk Shake", "Montagem de Bandeja"
 };
 
 typedef enum {
@@ -36,7 +47,7 @@ typedef enum {
     HABILIDADE_MONTAGEM  = 1 << 3
 } Habilidade;
 
-const int TEMPOS_DE_PREPARO[] = {58, 88, 105, 190, 5, 38, 60, 30};
+const int TEMPOS_DE_PREPARO[] = {190, 58, 88, 105, 5, 38, 60, 30};
 
 typedef struct Tarefa {
     int pedido_id;
@@ -66,7 +77,7 @@ typedef struct {
 } Equipamento;
 
 typedef struct {
-    int loja_id; // NOVO: Identificador (1 ou 2) para os logs de impressão
+    int loja_id; 
     int tempo_atual;
     Funcionario funcionarios[NUM_FUNCIONARIOS];
     Equipamento chapa;
@@ -85,15 +96,13 @@ typedef struct {
 } Cozinha;
 
 // =============================================================================
-// 2. FUNÇÕES DE GERENCIAMENTO DA COZINHA (Refatoradas)
+// 2. FUNÇÕES DE GERENCIAMENTO DA COZINHA (Sem alterações)
 // =============================================================================
 
-// Modificada para aceitar um ID de loja para clareza nos logs
 void inicializar_cozinha(Cozinha *cozinha, int loja_id)
 {
     memset(cozinha, 0, sizeof(Cozinha));
     cozinha->loja_id = loja_id;
-
     printf("--- Configurando a Cozinha da Loja %d ---\n", loja_id);
     cozinha->chapa.capacidade_por_funcionario = 3;
     cozinha->fritadeira.capacidade_por_funcionario = 2;
@@ -102,7 +111,6 @@ void inicializar_cozinha(Cozinha *cozinha, int loja_id)
     cozinha->liquidificador.validade_produto_min = 30;
     printf("Configuracao da Loja %d concluida.\n\n", loja_id);
 
-    // Mapeamento dos 13 funcionários (idêntico para ambas as lojas)
     cozinha->funcionarios[0] = (Funcionario){(loja_id * 100) + 1, HABILIDADE_SANDUICHE | HABILIDADE_BATATA, 0};
     cozinha->funcionarios[1] = (Funcionario){(loja_id * 100) + 2, HABILIDADE_SANDUICHE | HABILIDADE_BATATA, 0};
     cozinha->funcionarios[2] = (Funcionario){(loja_id * 100) + 3, HABILIDADE_SANDUICHE | HABILIDADE_BEBIDAS, 0};
@@ -118,9 +126,7 @@ void inicializar_cozinha(Cozinha *cozinha, int loja_id)
     cozinha->funcionarios[12] = (Funcionario){(loja_id * 100) + 13, 0, 0};
 }
 
-// (Função idêntica à anterior)
-void adicionar_pedido_na_fila_espera(Cozinha *c, Pedido *novo_pedido)
-{
+void adicionar_pedido_na_fila_espera(Cozinha *c, Pedido *novo_pedido) {
     novo_pedido->proximo = NULL;
     if (c->pedidos_na_fila_espera == NULL) {
         c->pedidos_na_fila_espera = novo_pedido;
@@ -132,9 +138,7 @@ void adicionar_pedido_na_fila_espera(Cozinha *c, Pedido *novo_pedido)
     }
 }
 
-// (Função idêntica à anterior)
-void limpar_cozinha(Cozinha *c)
-{
+void limpar_cozinha(Cozinha *c) {
     free(c->tarefas_em_execucao);
     free(c->tarefas_na_fila_preparo);
     for (int i = 0; i < c->num_pedidos_em_andamento; i++) {
@@ -151,9 +155,7 @@ void limpar_cozinha(Cozinha *c)
     }
 }
 
-// (Função idêntica à anterior)
-Pedido *encontrar_pedido_em_andamento(Cozinha *c, int pedido_id)
-{
+Pedido *encontrar_pedido_em_andamento(Cozinha *c, int pedido_id) {
     for (int i = 0; i < c->num_pedidos_em_andamento; i++) {
         if (c->pedidos_em_andamento[i]->id == pedido_id)
             return c->pedidos_em_andamento[i];
@@ -161,110 +163,93 @@ Pedido *encontrar_pedido_em_andamento(Cozinha *c, int pedido_id)
     return NULL;
 }
 
-// (Função idêntica à anterior)
-void imprimir_composicao_bandejas(Pedido *pedido)
-{
+void imprimir_composicao_bandejas(Pedido *pedido) {
     printf("\n--- Composicao do Pedido #%d ---\n", pedido->id);
-
     TipoItem itens_comer[pedido->num_itens];
     TipoItem itens_beber[pedido->num_itens];
-    int count_comer = 0;
-    int count_beber = 0;
-
+    int count_comer = 0, count_beber = 0;
     for (int i = 0; i < pedido->num_itens; i++) {
-        if (pedido->itens[i] <= ITEM_BATATA_FRITA) {
+        if (pedido->itens[i] <= ITEM_SANDUICHE_ELABORADO) {
             itens_comer[count_comer++] = pedido->itens[i];
         } else {
             itens_beber[count_beber++] = pedido->itens[i];
         }
     }
-
-    int bandeja_num = 1;
-    int idx_comer_atual = 0;
-    int idx_beber_atual = 0;
-
+    int bandeja_num = 1, idx_comer_atual = 0, idx_beber_atual = 0;
     while (idx_comer_atual < count_comer || idx_beber_atual < count_beber) {
         printf("Bandeja %d:\n", bandeja_num++);
-        for (int i = 0; i < 2 && idx_comer_atual < count_comer; i++) {
+        for (int i = 0; i < 2 && idx_comer_atual < count_comer; i++)
             printf("  - %s\n", NOMES_ITENS[itens_comer[idx_comer_atual++]]);
-        }
-        for (int i = 0; i < 2 && idx_beber_atual < count_beber; i++) {
+        for (int i = 0; i < 2 && idx_beber_atual < count_beber; i++)
             printf("  - %s\n", NOMES_ITENS[itens_beber[idx_beber_atual++]]);
-        }
     }
     printf("---------------------------------\n");
 }
 
+
 // =============================================================================
-// 3. LÓGICA DE ENTRADA E ROTEAMENTO (NOVAS FUNÇÕES)
+// 3. LÓGICA DE ENTRADA E ROTEAMENTO (CSV)
 // =============================================================================
 
-// Esta é uma versão modificada da antiga 'coletar_pedidos'.
-// Ela não tem mais o loop de "quantos pedidos", apenas cria UM pedido e o retorna.
-Pedido* criar_pedido_interativo(int id_pedido, int tempo_chegada)
-{
-    printf("\n--- Registrando Pedido #%d (chegada em t=%ds) ---\n", id_pedido, tempo_chegada);
+void criar_pasta_se_nao_existe(const char* nome_pasta) {
+#ifdef _WIN32
+    _mkdir(nome_pasta);
+#else 
+    mkdir(nome_pasta, 0777);
+#endif
+}
 
-    TipoItem *itens_do_pedido = NULL;
-    int qtd_itens = 0;
-    int escolha = -1;
-
-    do {
-        printf("Escolha os itens para o pedido #%d:\n", id_pedido);
-        for (int j = 0; j < 7; j++) // Mostra os 7 itens do cardápio
-            printf("  %d. %s\n", j + 1, NOMES_ITENS[j]);
-        printf("  0. Finalizar Pedido\n");
-        printf("Digite o numero do item: ");
-        scanf("%d", &escolha);
-
-        if (escolha >= 1 && escolha <= 7) {
-            int quantidade;
-            printf("Digite a quantidade do item: ");
-            scanf("%d", &quantidade);
-            if (quantidade < 1) {
-                printf("Quantidade invalida, adicionando 1 unidade.\n");
-                quantidade = 1;
-            }
-            for (int k = 0; k < quantidade; k++) {
-                qtd_itens++;
-                itens_do_pedido = (TipoItem *)realloc(itens_do_pedido, sizeof(TipoItem) * qtd_itens);
-                itens_do_pedido[qtd_itens - 1] = (TipoItem)(escolha - 1);
-            }
-            printf(">> (%d) - '%s' adicionado(s) ao pedido.\n\n", quantidade, NOMES_ITENS[escolha - 1]);
-        } else if (escolha != 0) {
-            printf("Opcao invalida! Tente novamente.\n\n");
+void criar_arquivo_entrada_exemplo() {
+    FILE* fp = fopen(ARQUIVO_INPUT, "r");
+    if (fp == NULL) {
+        printf("Aviso: Arquivo '%s' nao encontrado. Criando um exemplo...\n", ARQUIVO_INPUT);
+        fp = fopen(ARQUIVO_INPUT, "w");
+        if (fp == NULL) {
+            printf("Erro fatal: Nao foi possivel criar o arquivo de entrada de exemplo.\n");
+            return;
         }
-    } while (escolha != 0);
-
-    if (qtd_itens > 0) {
-        Pedido *novo_pedido = (Pedido *)malloc(sizeof(Pedido));
-        novo_pedido->id = id_pedido;
-        novo_pedido->tempo_chegada = tempo_chegada; // O tempo de chegada é o tempo global atual
-        novo_pedido->status = STATUS_NA_FILA;
-        novo_pedido->itens = itens_do_pedido;
-        novo_pedido->num_itens = qtd_itens;
-        novo_pedido->tarefas_preparo_restantes = qtd_itens;
-        
-        printf(">> Pedido #%d criado com %d itens.\n", id_pedido, qtd_itens);
-        return novo_pedido; // Retorna o pedido criado
+        fprintf(fp, "ID_Pedido,Qtd_Batata,Qtd_Simples,Qtd_Medio,Qtd_Elaborado,Qtd_Refri,Qtd_Suco,Qtd_Milkshake,Dist_Loja_1,Dist_Loja_2\n");
+        fprintf(fp, "1,2,6,5,2,4,0,1,0,5\n");
+        fprintf(fp, "2,0,0,0,0,1,0,0,5,0\n"); // Pedido 2 (simultâneo) para Loja 2
+        fprintf(fp, "0,0,0,0,0,0,0,0,0,0\n"); // Avança tempo para t=1
+        fprintf(fp, "3,5,4,5,9,2,1,1,11,9\n"); // Pedido 3 (iFood) chega em t=1
+        fclose(fp);
+        printf("Arquivo '%s' criado. Por favor, edite-o com os dados da simulacao e rode o programa novamente.\n", ARQUIVO_INPUT);
+        exit(1);
     } else {
-        printf(">> Pedido #%d cancelado por nao ter itens.\n", id_pedido);
-        return NULL; // Retorna nulo se o pedido foi cancelado
+        fclose(fp);
     }
 }
 
-// NOVA FUNÇÃO: O Roteador do iFood
-// Decide para qual loja enviar o pedido com base na menor fila de tarefas pendentes.
-void rotear_pedido_ifood(Pedido *pedido, Cozinha *loja1, Cozinha *loja2)
-{
-    if (pedido == NULL) return;
+Pedido* criar_pedido_com_itens(int id_pedido, int tempo_chegada, int quantidades[]) {
+    TipoItem *itens_do_pedido = NULL;
+    int qtd_total_itens = 0;
+    for (int i = 0; i < 7; i++) {
+        for (int k = 0; k < quantidades[i]; k++) {
+            qtd_total_itens++;
+            itens_do_pedido = (TipoItem *)realloc(itens_do_pedido, sizeof(TipoItem) * qtd_total_itens);
+            itens_do_pedido[qtd_total_itens - 1] = (TipoItem)i; 
+        }
+    }
+    if (qtd_total_itens > 0) {
+        Pedido *novo_pedido = (Pedido *)malloc(sizeof(Pedido));
+        novo_pedido->id = id_pedido;
+        novo_pedido->tempo_chegada = tempo_chegada;
+        novo_pedido->status = STATUS_NA_FILA;
+        novo_pedido->itens = itens_do_pedido;
+        novo_pedido->num_itens = qtd_total_itens;
+        novo_pedido->tarefas_preparo_restantes = qtd_total_itens;
+        printf(">> Pedido #%d criado com %d itens. Chegada em t=%ds.\n", id_pedido, qtd_total_itens, tempo_chegada);
+        return novo_pedido;
+    }
+    return NULL;
+}
 
-    // A Métrica de Decisão: qual cozinha tem menos tarefas na fila de preparo.
+void rotear_pedido_ifood(Pedido *pedido, Cozinha *loja1, Cozinha *loja2) {
+    if (pedido == NULL) return;
     int carga_loja_1 = loja1->num_tarefas_na_fila_preparo;
     int carga_loja_2 = loja2->num_tarefas_na_fila_preparo;
-
     printf("[Roteador iFood] Carga Loja 1: %d tarefas | Carga Loja 2: %d tarefas.\n", carga_loja_1, carga_loja_2);
-
     if (carga_loja_1 <= carga_loja_2) {
         printf("[Roteador iFood] Enviando Pedido #%d para a Loja 1 (menos ocupada).\n", pedido->id);
         adicionar_pedido_na_fila_espera(loja1, pedido);
@@ -274,16 +259,71 @@ void rotear_pedido_ifood(Pedido *pedido, Cozinha *loja1, Cozinha *loja2)
     }
 }
 
+
+// --- FUNÇÃO DE LEITURA DE ARQUIVO CORRIGIDA PARA SIMULTANEIDADE ---
+void carregar_eventos_do_arquivo(FILE* fp, Cozinha* loja1, Cozinha* loja2) {
+    char linha[256];
+    int tempo_de_chegada_atual = 0;
+    
+    // Pula a primeira linha (cabeçalho)
+    fgets(linha, sizeof(linha), fp); 
+
+    while (fgets(linha, sizeof(linha), fp) != NULL) {
+        int valores[10];
+        int i = 0;
+        char* token = strtok(linha, ",");
+        while (token != NULL && i < 10) {
+            valores[i++] = atoi(token);
+            token = strtok(NULL, ",");
+        }
+        if (i < 10) continue; 
+        
+        int id = valores[0];
+
+        if (id == 0 || id == '-') {
+            // "ID 0" é o único comando que avança o relógio de chegada
+            tempo_de_chegada_atual++;
+            printf("[Carregador] Tick de tempo ocioso. Proximo evento em t=%d\n", tempo_de_chegada_atual);
+        } else {
+            // É um pedido válido. Ele chega no TEMPO ATUAL.
+            // O tempo NÃO é incrementado aqui.
+            int quantidades[7];
+            for(int j=0; j<7; j++) {
+                quantidades[j] = valores[j+1];
+            }
+            int dist1 = valores[8];
+            int dist2 = valores[9];
+
+            Pedido* novo_pedido = criar_pedido_com_itens(id, tempo_de_chegada_atual, quantidades);
+            if (novo_pedido == NULL) continue;
+            
+            if (dist1 == 0) {
+                printf("[Carregador] Pedido #%d presencial na Loja 1.\n", id);
+                adicionar_pedido_na_fila_espera(loja1, novo_pedido);
+            } else if (dist2 == 0) {
+                printf("[Carregador] Pedido #%d presencial na Loja 2.\n", id);
+                adicionar_pedido_na_fila_espera(loja2, novo_pedido);
+            } else {
+                printf("[Carregador] Pedido #%d e um pedido iFood (Dist: L1=%d, L2=%d).\n", id, dist1, dist2);
+                rotear_pedido_ifood(novo_pedido, loja1, loja2);
+            }
+            
+            // REMOVIDO: tempo_de_chegada_atual++;
+            // Isso garante que múltiplos pedidos listados em sequência 
+            // no CSV antes de um "0" cheguem no mesmo segundo.
+        }
+    }
+    printf("\n=== Carregamento do arquivo de entrada concluido. ===\n");
+}
+
+
 // =============================================================================
-// 4. O NOVO MOTOR DA SIMULAÇÃO (Refatorado)
+// 4. O MOTOR DA SIMULAÇÃO (Sem alterações)
 // =============================================================================
 
-// (Função idêntica à anterior, mas com o printf modificado para mostrar a Loja)
-void despachar_tarefas(Cozinha *c)
-{
+void despachar_tarefas(Cozinha *c) {
     Habilidade habilidades[] = {HABILIDADE_SANDUICHE, HABILIDADE_BATATA, HABILIDADE_BEBIDAS, HABILIDADE_MONTAGEM};
     Equipamento *equipamentos[] = {&c->chapa, &c->fritadeira, &c->liquidificador, NULL};
-
     for (int h = 0; h < 4; h++) {
         int funcs_livres[NUM_FUNCIONARIOS];
         int num_funcs_livres = 0;
@@ -292,18 +332,13 @@ void despachar_tarefas(Cozinha *c)
                 funcs_livres[num_funcs_livres++] = i;
             }
         }
-
         if (num_funcs_livres == 0) continue;
-
         int capacidade_total = num_funcs_livres * (equipamentos[h] ? equipamentos[h]->capacidade_por_funcionario : 1);
         int tarefas_alocadas_nesta_rodada = 0;
-
         for (int i = c->num_tarefas_na_fila_preparo - 1; i >= 0; i--) {
             if (tarefas_alocadas_nesta_rodada >= capacidade_total) break;
-
             Tarefa *tarefa_atual = &c->tarefas_na_fila_preparo[i];
             int tarefa_corresponde = 0;
-
             switch (habilidades[h]) {
                 case HABILIDADE_SANDUICHE:
                     if (tarefa_atual->tipo_item >= ITEM_SANDUICHE_SIMPLES && tarefa_atual->tipo_item <= ITEM_SANDUICHE_ELABORADO) tarefa_corresponde = 1;
@@ -318,20 +353,16 @@ void despachar_tarefas(Cozinha *c)
                     if (tarefa_atual->tipo_item == ITEM_MONTAGEM) tarefa_corresponde = 1;
                     break;
             }
-
             if (tarefa_corresponde) {
                 int id_func_alocado = funcs_livres[tarefas_alocadas_nesta_rodada % num_funcs_livres];
                 tarefa_atual->tempo_conclusao = c->tempo_atual + TEMPOS_DE_PREPARO[tarefa_atual->tipo_item];
                 c->funcionarios[id_func_alocado].livre_a_partir_de = tarefa_atual->tempo_conclusao;
-
                 c->num_tarefas_em_execucao++;
                 c->tarefas_em_execucao = (Tarefa *)realloc(c->tarefas_em_execucao, sizeof(Tarefa) * c->num_tarefas_em_execucao);
                 c->tarefas_em_execucao[c->num_tarefas_em_execucao - 1] = *tarefa_atual;
-
                 printf("[Loja %d | Tempo: %ds] Func. #%d iniciou %s do Pedido #%d (conclui em %ds).\n", 
                        c->loja_id, c->tempo_atual, c->funcionarios[id_func_alocado].id, 
                        NOMES_ITENS[tarefa_atual->tipo_item], tarefa_atual->pedido_id, tarefa_atual->tempo_conclusao);
-
                 c->tarefas_na_fila_preparo[i] = c->tarefas_na_fila_preparo[c->num_tarefas_na_fila_preparo - 1];
                 c->num_tarefas_na_fila_preparo--;
                 tarefas_alocadas_nesta_rodada++;
@@ -340,25 +371,16 @@ void despachar_tarefas(Cozinha *c)
     }
 }
 
-// NOVA FUNÇÃO: Substitui a antiga 'executar_simulacao'.
-// Esta função processa TODOS os eventos de UMA cozinha que devem acontecer em UM SEGUNDO.
-void atualizar_cozinha_um_passo(Cozinha *cozinha, int tempo_global_atual)
-{
-    // 1. Sincroniza o relógio desta cozinha com o relógio global.
+void atualizar_cozinha_um_passo(Cozinha *cozinha, int tempo_global_atual) {
     cozinha->tempo_atual = tempo_global_atual;
-
-    // 2. Processa tarefas que terminaram NESTE SEGUNDO.
     for (int i = cozinha->num_tarefas_em_execucao - 1; i >= 0; i--) {
         Tarefa *tarefa_concluida = &cozinha->tarefas_em_execucao[i];
-        
         if (tarefa_concluida->tempo_conclusao <= cozinha->tempo_atual) {
             Pedido *pedido_pai = encontrar_pedido_em_andamento(cozinha, tarefa_concluida->pedido_id);
             if (!pedido_pai) continue;
-
             printf("[Loja %d | Tempo: %ds] %s do Pedido #%d foi concluido.\n", 
                    cozinha->loja_id, cozinha->tempo_atual, 
                    NOMES_ITENS[tarefa_concluida->tipo_item], pedido_pai->id);
-
             if (tarefa_concluida->tipo_item == ITEM_MONTAGEM) {
                 int tempo_de_producao = cozinha->tempo_atual - pedido_pai->tempo_chegada;
                 if (tempo_de_producao <= TEMPO_MAX_ATENDIMENTO) {
@@ -385,26 +407,20 @@ void atualizar_cozinha_um_passo(Cozinha *cozinha, int tempo_global_atual)
                            cozinha->loja_id, cozinha->tempo_atual, pedido_pai->id);
                 }
             }
-            // Remove a tarefa da lista de execução
             cozinha->tarefas_em_execucao[i] = cozinha->tarefas_em_execucao[cozinha->num_tarefas_em_execucao - 1];
             cozinha->num_tarefas_em_execucao--;
         }
     }
-
-    // 3. Processa a chegada de novos pedidos da fila de espera interna (que foram roteados para cá).
     while (cozinha->pedidos_na_fila_espera != NULL && cozinha->pedidos_na_fila_espera->tempo_chegada <= cozinha->tempo_atual) {
         Pedido *pedido_iniciado = cozinha->pedidos_na_fila_espera;
         cozinha->pedidos_na_fila_espera = cozinha->pedidos_na_fila_espera->proximo;
-
         pedido_iniciado->status = STATUS_EM_PREPARO;
         cozinha->num_pedidos_em_andamento++;
         cozinha->pedidos_em_andamento = (Pedido **)realloc(cozinha->pedidos_em_andamento, sizeof(Pedido *) * cozinha->num_pedidos_em_andamento);
         cozinha->pedidos_em_andamento[cozinha->num_pedidos_em_andamento - 1] = pedido_iniciado;
-
         printf("[Loja %d | Tempo: %ds] Iniciando preparo do Pedido #%d.\n", 
                cozinha->loja_id, cozinha->tempo_atual, pedido_iniciado->id);
-        
-        cozinha->total_pedidos_criados++; // Incrementa o contador da loja
+        cozinha->total_pedidos_criados++;
         for (int i = 0; i < pedido_iniciado->num_itens; i++) {
             Tarefa t = {pedido_iniciado->id, pedido_iniciado->itens[i], 0};
             cozinha->num_tarefas_na_fila_preparo++;
@@ -412,98 +428,71 @@ void atualizar_cozinha_um_passo(Cozinha *cozinha, int tempo_global_atual)
             cozinha->tarefas_na_fila_preparo[cozinha->num_tarefas_na_fila_preparo - 1] = t;
         }
     }
-
-    // 4. Tenta despachar novas tarefas para funcionários que acabaram de ficar livres.
     despachar_tarefas(cozinha);
 }
 
-// Função auxiliar para verificar se as cozinhas ainda têm trabalho pendente.
-int cozinhas_estao_ocupadas(Cozinha *loja1, Cozinha *loja2)
-{
-    // Verifica se há pedidos em qualquer fila ou tarefas em qualquer estado em qualquer loja
+int cozinhas_estao_ocupadas(Cozinha *loja1, Cozinha *loja2) {
     int loja1_ocupada = loja1->pedidos_na_fila_espera != NULL || 
                         loja1->num_tarefas_na_fila_preparo > 0 || 
                         loja1->num_tarefas_em_execucao > 0;
-    
     int loja2_ocupada = loja2->pedidos_na_fila_espera != NULL || 
                         loja2->num_tarefas_na_fila_preparo > 0 || 
                         loja2->num_tarefas_em_execucao > 0;
-
     return loja1_ocupada || loja2_ocupada;
 }
 
-
 // =============================================================================
-// 5. FUNÇÃO PRINCIPAL (Refatorada para ser o Motor Global)
+// 5. FUNÇÃO PRINCIPAL (MODIFICADA PARA LER DE ARQUIVO)
 // =============================================================================
 int main()
 {
     system("cls||clear");
 
+    printf("Verificando pastas de Input/Output...\n");
+    criar_pasta_se_nao_existe(PASTA_INPUT);
+    criar_pasta_se_nao_existe(PASTA_OUTPUT);
+
+    if (freopen(ARQUIVO_OUTPUT, "w", stdout) == NULL) {
+        perror("Erro ao redirecionar a saida para o arquivo");
+        return 1;
+    }
+    printf("Log da Simulacao - BigPapao Fase 2\n");
+    printf("======================================\n");
+
+    criar_arquivo_entrada_exemplo(); 
+    
+    FILE *arquivo_entrada = fopen(ARQUIVO_INPUT, "r");
+    if (arquivo_entrada == NULL) {
+        printf("Erro fatal: Nao foi possivel abrir o arquivo '%s' para leitura.\n", ARQUIVO_INPUT);
+        return 1;
+    }
+    printf("Lendo eventos do arquivo '%s'...\n", ARQUIVO_INPUT);
+
     Cozinha cozinha_loja_1;
     Cozinha cozinha_loja_2;
-    int proximo_id_pedido_global = 1;
-
-    // 1. Inicializa as duas cozinhas com IDs diferentes
     inicializar_cozinha(&cozinha_loja_1, 1);
     inicializar_cozinha(&cozinha_loja_2, 2);
 
+    carregar_eventos_do_arquivo(arquivo_entrada, &cozinha_loja_1, &cozinha_loja_2);
+    fclose(arquivo_entrada);
+
+    printf("\n=== INICIANDO SIMULACAO DA COZINHA BIGPAPAO ===\n");
     int tempo_global = 0;
-    int entrada_ativa = 1; // Controla se ainda estamos aceitando novos pedidos
-
-    printf("\n=== INICIANDO SIMULACAO DO BIGPAPAO (Duas Lojas + iFood) ===\n");
-    printf("Digite o destino (1=Loja 1, 2=Loja 2, 3=iFood)\n");
-    printf("Digite 0 ou - para avancar 1 segundo (simular tempo ocioso).\n");
-    printf("Digite -1 para encerrar a entrada de pedidos e deixar a simulacao terminar.\n");
-
-    // O NOVO MOTOR DA SIMULAÇÃO: avança segundo a segundo.
-    while (entrada_ativa || cozinhas_estao_ocupadas(&cozinha_loja_1, &cozinha_loja_2))
+    
+    while (cozinhas_estao_ocupadas(&cozinha_loja_1, &cozinha_loja_2))
     {
-        // 2. Processa a entrada do usuário, se ainda estiver ativa
-        if (entrada_ativa) {
-            printf("\n[Tempo Global: %ds] Destino (1=Loja1, 2=Loja2, 3=iFood, 0=Ocioso, -1=Sair): ", tempo_global);
-            
-            char input_str[10];
-            scanf("%s", input_str);
-            int destino = atoi(input_str); // Converte a string para número
-
-            if (destino == -1) { // Encerrar entrada de pedidos
-                entrada_ativa = 0;
-                printf("[Sistema] Nao ha mais novos pedidos. Processando os pedidos restantes...\n");
-            } 
-            else if (destino == 0 || strcmp(input_str, "-") == 0) { // Simular tempo ocioso
-                printf("[Sistema] Tempo ocioso no caixa. Cozinhas continuam trabalhando...\n");
-            } 
-            else if (destino == 1 || destino == 2 || destino == 3) {
-                // Se a entrada for válida, cria um novo pedido
-                Pedido *novo_pedido = criar_pedido_interativo(proximo_id_pedido_global++, tempo_global);
-                
-                if (novo_pedido) {
-                    if (destino == 1) {
-                        adicionar_pedido_na_fila_espera(&cozinha_loja_1, novo_pedido);
-                    } else if (destino == 2) {
-                        adicionar_pedido_na_fila_espera(&cozinha_loja_2, novo_pedido);
-                    } else if (destino == 3) {
-                        // Chama o roteador para decidir para onde o pedido iFood deve ir
-                        rotear_pedido_ifood(novo_pedido, &cozinha_loja_1, &cozinha_loja_2);
-                    }
-                }
-            } 
-            else {
-                printf("Entrada invalida. Digite 1, 2, 3, 0, ou -1.\n");
-            }
-        }
-
-        // 3. Atualiza o estado de ambas as cozinhas para este segundo
         atualizar_cozinha_um_passo(&cozinha_loja_1, tempo_global);
         atualizar_cozinha_um_passo(&cozinha_loja_2, tempo_global);
 
-        // 4. Avança o relógio global em 1 segundo
         tempo_global++;
+
+        if(tempo_global > 100000) {
+             printf("Simulacao excedeu 100.000 segundos. Interrompendo.\n");
+             break;
+        }
     }
 
-    // 5. Relatório Final
-    printf("\n=== SIMULACAO FINALIZADA EM %d SEGUNDOS (TEMPO TOTAL DECORRIDO) ===\n", tempo_global - 1);
+    printf("\n=== SIMULACAO FINALIZADA EM %d SEGUNDOS (TEMPO TOTAL DECORRIDO) ===\n", tempo_global);
     
     printf("\n--- Resultados Loja 1 ---\n");
     printf("Total de Pedidos Processados: %d\n", cozinha_loja_1.total_pedidos_criados);
@@ -515,9 +504,11 @@ int main()
     printf("Atendidos no Prazo: %d\n", cozinha_loja_2.atendidos_no_prazo);
     printf("Atendidos com Atraso (Prejuizo): %d\n", cozinha_loja_2.atendidos_com_atraso);
 
-    // 6. Limpa a memória de ambas as cozinhas
     limpar_cozinha(&cozinha_loja_1);
     limpar_cozinha(&cozinha_loja_2);
     
+    printf("\n======================================\n");
+    printf("Log salvo em '%s'\n", ARQUIVO_OUTPUT);
+
     return 0;
 }

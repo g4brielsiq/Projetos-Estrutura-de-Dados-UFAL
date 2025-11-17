@@ -1,0 +1,179 @@
+Lendo eventos do arquivo 'Input/entrada.txt'...
+--- Configurando a Cozinha da Loja 1 ---
+Configuracao da Loja 1 concluida.
+
+--- Configurando a Cozinha da Loja 2 ---
+Configuracao da Loja 2 concluida.
+
+>> Pedido #1 criado com 20 itens. Chegada em t=0s.
+[Carregador] Pedido #1 presencial na Loja 1.
+>> Pedido #2 criado com 20 itens. Chegada em t=1s.
+[Carregador] Pedido #2 presencial na Loja 2.
+
+=== Carregamento do arquivo de entrada concluido. ===
+
+=== INICIANDO SIMULACAO DA COZINHA BIGPAPAO ===
+[Loja 1 | Tempo: 0s] Iniciando preparo do Pedido #1.
+[Loja 1 | Tempo: 0s] Func. #101 iniciou Sanduiche Elaborado do Pedido #1 (conclui em 105s).
+[Loja 1 | Tempo: 0s] Func. #102 iniciou Sanduiche Elaborado do Pedido #1 (conclui em 105s).
+[Loja 1 | Tempo: 0s] Func. #103 iniciou Sanduiche Medio do Pedido #1 (conclui em 88s).
+[Loja 1 | Tempo: 0s] Func. #104 iniciou Sanduiche Medio do Pedido #1 (conclui em 88s).
+[Loja 1 | Tempo: 0s] Func. #105 iniciou Sanduiche Medio do Pedido #1 (conclui em 88s).
+[Loja 1 | Tempo: 0s] Func. #106 iniciou Sanduiche Medio do Pedido #1 (conclui em 88s).
+[Loja 1 | Tempo: 0s] Func. #111 iniciou Sanduiche Medio do Pedido #1 (conclui em 88s).
+[Loja 1 | Tempo: 0s] Func. #101 iniciou Sanduiche Simples do Pedido #1 (conclui em 58s).
+[Loja 1 | Tempo: 0s] Func. #102 iniciou Sanduiche Simples do Pedido #1 (conclui em 58s).
+[Loja 1 | Tempo: 0s] Func. #103 iniciou Sanduiche Simples do Pedido #1 (conclui em 58s).
+[Loja 1 | Tempo: 0s] Func. #104 iniciou Sanduiche Simples do Pedido #1 (conclui em 58s).
+[Loja 1 | Tempo: 0s] Func. #105 iniciou Sanduiche Simples do Pedido #1 (conclui em 58s).
+[Loja 1 | Tempo: 0s] Func. #106 iniciou Sanduiche Simples do Pedido #1 (conclui em 58s).
+[Loja 1 | Tempo: 0s] Func. #107 iniciou Batata Frita do Pedido #1 (conclui em 190s).
+[Loja 1 | Tempo: 0s] Func. #107 iniciou Batata Frita do Pedido #1 (conclui em 190s).
+[Loja 1 | Tempo: 0s] Func. #108 iniciou Milk Shake do Pedido #1 (conclui em 60s).
+[Loja 1 | Tempo: 0s] Func. #112 iniciou Refrigerante do Pedido #1 (conclui em 5s).
+[Loja 1 | Tempo: 0s] Func. #108 iniciou Refrigerante do Pedido #1 (conclui em 5s).
+[Loja 1 | Tempo: 0s] Func. #112 iniciou Refrigerante do Pedido #1 (conclui em 5s).
+[Loja 1 | Tempo: 0s] Func. #108 iniciou Refrigerante do Pedido #1 (conclui em 5s).
+[Loja 2 | Tempo: 1s] Iniciando preparo do Pedido #2.
+[Loja 2 | Tempo: 1s] Func. #201 iniciou Sanduiche Elaborado do Pedido #2 (conclui em 106s).
+[Loja 2 | Tempo: 1s] Func. #202 iniciou Sanduiche Elaborado do Pedido #2 (conclui em 106s).
+[Loja 2 | Tempo: 1s] Func. #203 iniciou Sanduiche Medio do Pedido #2 (conclui em 89s).
+[Loja 2 | Tempo: 1s] Func. #204 iniciou Sanduiche Medio do Pedido #2 (conclui em 89s).
+[Loja 2 | Tempo: 1s] Func. #205 iniciou Sanduiche Medio do Pedido #2 (conclui em 89s).
+[Loja 2 | Tempo: 1s] Func. #206 iniciou Sanduiche Medio do Pedido #2 (conclui em 89s).
+[Loja 2 | Tempo: 1s] Func. #211 iniciou Sanduiche Medio do Pedido #2 (conclui em 89s).
+[Loja 2 | Tempo: 1s] Func. #201 iniciou Sanduiche Simples do Pedido #2 (conclui em 59s).
+[Loja 2 | Tempo: 1s] Func. #202 iniciou Sanduiche Simples do Pedido #2 (conclui em 59s).
+[Loja 2 | Tempo: 1s] Func. #203 iniciou Sanduiche Simples do Pedido #2 (conclui em 59s).
+[Loja 2 | Tempo: 1s] Func. #204 iniciou Sanduiche Simples do Pedido #2 (conclui em 59s).
+[Loja 2 | Tempo: 1s] Func. #205 iniciou Sanduiche Simples do Pedido #2 (conclui em 59s).
+[Loja 2 | Tempo: 1s] Func. #206 iniciou Sanduiche Simples do Pedido #2 (conclui em 59s).
+[Loja 2 | Tempo: 1s] Func. #207 iniciou Batata Frita do Pedido #2 (conclui em 191s).
+[Loja 2 | Tempo: 1s] Func. #207 iniciou Batata Frita do Pedido #2 (conclui em 191s).
+[Loja 2 | Tempo: 1s] Func. #208 iniciou Milk Shake do Pedido #2 (conclui em 61s).
+[Loja 2 | Tempo: 1s] Func. #212 iniciou Refrigerante do Pedido #2 (conclui em 6s).
+[Loja 2 | Tempo: 1s] Func. #208 iniciou Refrigerante do Pedido #2 (conclui em 6s).
+[Loja 2 | Tempo: 1s] Func. #212 iniciou Refrigerante do Pedido #2 (conclui em 6s).
+[Loja 2 | Tempo: 1s] Func. #208 iniciou Refrigerante do Pedido #2 (conclui em 6s).
+[Loja 1 | Tempo: 5s] Refrigerante do Pedido #1 foi concluido.
+[Loja 1 | Tempo: 5s] Refrigerante do Pedido #1 foi concluido.
+[Loja 1 | Tempo: 5s] Refrigerante do Pedido #1 foi concluido.
+[Loja 1 | Tempo: 5s] Refrigerante do Pedido #1 foi concluido.
+[Loja 2 | Tempo: 6s] Refrigerante do Pedido #2 foi concluido.
+[Loja 2 | Tempo: 6s] Refrigerante do Pedido #2 foi concluido.
+[Loja 2 | Tempo: 6s] Refrigerante do Pedido #2 foi concluido.
+[Loja 2 | Tempo: 6s] Refrigerante do Pedido #2 foi concluido.
+[Loja 1 | Tempo: 58s] Sanduiche Simples do Pedido #1 foi concluido.
+[Loja 1 | Tempo: 58s] Sanduiche Simples do Pedido #1 foi concluido.
+[Loja 1 | Tempo: 58s] Sanduiche Simples do Pedido #1 foi concluido.
+[Loja 1 | Tempo: 58s] Sanduiche Simples do Pedido #1 foi concluido.
+[Loja 1 | Tempo: 58s] Sanduiche Simples do Pedido #1 foi concluido.
+[Loja 1 | Tempo: 58s] Sanduiche Simples do Pedido #1 foi concluido.
+[Loja 2 | Tempo: 59s] Sanduiche Simples do Pedido #2 foi concluido.
+[Loja 2 | Tempo: 59s] Sanduiche Simples do Pedido #2 foi concluido.
+[Loja 2 | Tempo: 59s] Sanduiche Simples do Pedido #2 foi concluido.
+[Loja 2 | Tempo: 59s] Sanduiche Simples do Pedido #2 foi concluido.
+[Loja 2 | Tempo: 59s] Sanduiche Simples do Pedido #2 foi concluido.
+[Loja 2 | Tempo: 59s] Sanduiche Simples do Pedido #2 foi concluido.
+[Loja 1 | Tempo: 60s] Milk Shake do Pedido #1 foi concluido.
+[Loja 2 | Tempo: 61s] Milk Shake do Pedido #2 foi concluido.
+[Loja 1 | Tempo: 88s] Sanduiche Medio do Pedido #1 foi concluido.
+[Loja 1 | Tempo: 88s] Sanduiche Medio do Pedido #1 foi concluido.
+[Loja 1 | Tempo: 88s] Sanduiche Medio do Pedido #1 foi concluido.
+[Loja 1 | Tempo: 88s] Sanduiche Medio do Pedido #1 foi concluido.
+[Loja 1 | Tempo: 88s] Sanduiche Medio do Pedido #1 foi concluido.
+[Loja 2 | Tempo: 89s] Sanduiche Medio do Pedido #2 foi concluido.
+[Loja 2 | Tempo: 89s] Sanduiche Medio do Pedido #2 foi concluido.
+[Loja 2 | Tempo: 89s] Sanduiche Medio do Pedido #2 foi concluido.
+[Loja 2 | Tempo: 89s] Sanduiche Medio do Pedido #2 foi concluido.
+[Loja 2 | Tempo: 89s] Sanduiche Medio do Pedido #2 foi concluido.
+[Loja 1 | Tempo: 105s] Sanduiche Elaborado do Pedido #1 foi concluido.
+[Loja 1 | Tempo: 105s] Sanduiche Elaborado do Pedido #1 foi concluido.
+[Loja 2 | Tempo: 106s] Sanduiche Elaborado do Pedido #2 foi concluido.
+[Loja 2 | Tempo: 106s] Sanduiche Elaborado do Pedido #2 foi concluido.
+[Loja 1 | Tempo: 190s] Batata Frita do Pedido #1 foi concluido.
+[Loja 1 | Tempo: 190s] Batata Frita do Pedido #1 foi concluido.
+[Loja 1 | Tempo: 190s] Pedido #1 pronto para montagem.
+[Loja 1 | Tempo: 190s] Func. #108 iniciou Montagem de Bandeja do Pedido #1 (conclui em 220s).
+[Loja 2 | Tempo: 191s] Batata Frita do Pedido #2 foi concluido.
+[Loja 2 | Tempo: 191s] Batata Frita do Pedido #2 foi concluido.
+[Loja 2 | Tempo: 191s] Pedido #2 pronto para montagem.
+[Loja 2 | Tempo: 191s] Func. #208 iniciou Montagem de Bandeja do Pedido #2 (conclui em 221s).
+[Loja 1 | Tempo: 220s] Montagem de Bandeja do Pedido #1 foi concluido.
+>> [Loja 1] Pedido #1 FINALIZADO com SUCESSO. Tempo de producao: 220s.
+
+--- Composicao do Pedido #1 ---
+Bandeja 1:
+  - Batata Frita
+  - Batata Frita
+  - Refrigerante
+  - Refrigerante
+Bandeja 2:
+  - Sanduiche Simples
+  - Sanduiche Simples
+  - Refrigerante
+  - Refrigerante
+Bandeja 3:
+  - Sanduiche Simples
+  - Sanduiche Simples
+  - Milk Shake
+Bandeja 4:
+  - Sanduiche Simples
+  - Sanduiche Simples
+Bandeja 5:
+  - Sanduiche Medio
+  - Sanduiche Medio
+Bandeja 6:
+  - Sanduiche Medio
+  - Sanduiche Medio
+Bandeja 7:
+  - Sanduiche Medio
+  - Sanduiche Elaborado
+Bandeja 8:
+  - Sanduiche Elaborado
+---------------------------------
+[Loja 2 | Tempo: 221s] Montagem de Bandeja do Pedido #2 foi concluido.
+>> [Loja 2] Pedido #2 FINALIZADO com SUCESSO. Tempo de producao: 220s.
+
+--- Composicao do Pedido #2 ---
+Bandeja 1:
+  - Batata Frita
+  - Batata Frita
+  - Refrigerante
+  - Refrigerante
+Bandeja 2:
+  - Sanduiche Simples
+  - Sanduiche Simples
+  - Refrigerante
+  - Refrigerante
+Bandeja 3:
+  - Sanduiche Simples
+  - Sanduiche Simples
+  - Milk Shake
+Bandeja 4:
+  - Sanduiche Simples
+  - Sanduiche Simples
+Bandeja 5:
+  - Sanduiche Medio
+  - Sanduiche Medio
+Bandeja 6:
+  - Sanduiche Medio
+  - Sanduiche Medio
+Bandeja 7:
+  - Sanduiche Medio
+  - Sanduiche Elaborado
+Bandeja 8:
+  - Sanduiche Elaborado
+---------------------------------
+
+=== SIMULACAO FINALIZADA EM 222 SEGUNDOS (TEMPO TOTAL DECORRIDO) ===
+
+--- Resultados Loja 1 ---
+Total de Pedidos Processados: 1
+Atendidos no Prazo: 1
+Atendidos com Atraso (Prejuizo): 0
+
+--- Resultados Loja 2 ---
+Total de Pedidos Processados: 1
+Atendidos no Prazo: 1
+Atendidos com Atraso (Prejuizo): 0
